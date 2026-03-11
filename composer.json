@@ -10,14 +10,13 @@
     ],
     "repositories": [
         {
-            "type": "path",
-            "url": "../access"
+            "type": "vcs",
+            "url": "git@github.iu.edu:nsrodrig/shadow-access.git"
         }
     ],
-    "minimum-stability": "dev",
     "require": {
         "php": "~8.4.0",
-        "shadow/access": "dev-main",
+        "shadow/access": "dev-develop",
         "league/container": "^5.1",
         "league/route": "^6.2",
         "laminas/laminas-diactoros": "^3.6",

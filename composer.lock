@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "68614174967f1d172ab4c0fe9f51670c",
+    "content-hash": "4496fbaaf6725c7aa6327a37e237654d",
     "packages": [
         {
             "name": "apereo/phpcas",
@@ -893,11 +893,11 @@
         },
         {
             "name": "shadow/access",
-            "version": "dev-main",
-            "dist": {
-                "type": "path",
-                "url": "../access",
-                "reference": "b1f3ee54b66c4605264938a68cf4a4e7775943c2"
+            "version": "dev-develop",
+            "source": {
+                "type": "git",
+                "url": "git@github.iu.edu:nsrodrig/shadow-access.git",
+                "reference": "7a46cc48b65fe79eab00c93f430ffd8c7bc099e7"
             },
             "require": {
                 "apereo/phpcas": "~1.6.0",
@@ -907,6 +907,7 @@
             "require-dev": {
                 "phpunit/phpunit": "^13.0"
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -925,9 +926,7 @@
                 }
             ],
             "description": "IU Login (CAS, OIDC) and access control (ACM) middleware.",
-            "transport-options": {
-                "relative": true
-            }
+            "time": "2026-03-11T12:53:29+00:00"
         }
     ],
     "packages-dev": [
