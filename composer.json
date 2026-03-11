@@ -1,0 +1,39 @@
+{
+    "name": "shadow/framework",
+    "description": "IU-centric PHP framework for small projects.",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Nathan Skky Rodriguez",
+            "email": "nsrodrig@iu.edu"
+        }
+    ],
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../access"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "php": "~8.4.0",
+        "shadow/access": "dev-main",
+        "league/container": "^5.1",
+        "league/route": "^6.2",
+        "laminas/laminas-diactoros": "^3.6",
+        "laminas/laminas-httphandlerrunner": "^2.12"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Shadow\\Framework\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Shadow\\Framework\\Test\\": "tests"
+        }
+    }
+}
