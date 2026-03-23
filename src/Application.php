@@ -2,12 +2,12 @@
 
 namespace Shadow\Framework;
 
-use Shadow\Access\Authentication\AuthenticationServiceProvider;
 use Laminas\Diactoros\ServerRequestFactory;
 use Laminas\HttpHandlerRunner\Emitter\SapiEmitter;
 use League\Container\Argument\Literal;
 use League\Container\Container;
 use Psr\Http\Message\ServerRequestInterface;
+use Shadow\Framework\ServiceProvider\AuthenticationServiceProvider;
 
 class Application extends Container
 {
