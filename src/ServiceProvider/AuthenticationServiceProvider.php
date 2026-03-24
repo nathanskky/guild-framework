@@ -2,10 +2,14 @@
 
 namespace Shadow\Framework\ServiceProvider;
 
+use Error;
 use League\Container\ServiceProvider\AbstractServiceProvider;
 use League\Container\ServiceProvider\BootableServiceProviderInterface;
+use Psr\Container\ContainerExceptionInterface;
+use Psr\Container\NotFoundExceptionInterface;
 use Shadow\Access\Authentication\AuthenticationConfigurationInterface;
 use Shadow\Access\Authentication\AuthenticationMiddleware;
+use Shadow\Framework\Exception\ConfigurationException;
 
 class AuthenticationServiceProvider extends AbstractServiceProvider implements BootableServiceProviderInterface
 {
@@ -41,13 +45,33 @@ class AuthenticationServiceProvider extends AbstractServiceProvider implements B
         $this->getContainer()->addShared(AuthenticationMiddleware::class)->addArgument($authenticationConfig);
     }
 
+    /**
+     * @throws ConfigurationException
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     */
     public function boot(): void
     {
-        $authenticationConfigFilePath = $this->getContainer()->get('path.base') . '/config/authentication.php';
-        $authenticationConfig = require $authenticationConfigFilePath;
+        // TODO: move authentication file name to Application class, for centralization
+        $authenticationConfigFilePath = $this->getContainer()->get('path.config') . '/authentication.php';
 
-        if (! $authenticationConfig instanceof AuthenticationConfigurationInterface) {
-            throw new \Exception(); // TODO
+        try {
+            $authenticationConfig = require $authenticationConfigFilePath;
+        } catch (Error $error) {
+            throw new ConfigurationException(
+                'Problem encountered while attempting to read authentication config file: '
+                . $error->getMessage()
+            );
+        }
+
+        if (!($authenticationConfig instanceof AuthenticationConfigurationInterface)) {
+            throw new ConfigurationException(
+                'Expected the authentication config file to return an object implementing '
+                . AuthenticationConfigurationInterface::class
+                . ', but '
+                . is_object($authenticationConfig) ? $authenticationConfig::class : gettype($authenticationConfig)
+                . ' returned instead.'
+            );
         }
 
         $this->getContainer()->addShared(AuthenticationConfigurationInterface::class, $authenticationConfig);
