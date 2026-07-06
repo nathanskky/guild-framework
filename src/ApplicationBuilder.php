@@ -2,6 +2,8 @@
 
 namespace Shadow\Framework;
 
+use Shadow\Framework\ServiceProvider\AuthenticationServiceProvider;
+
 class ApplicationBuilder
 {
     public function __construct(private Application $app)
@@ -19,6 +21,13 @@ class ApplicationBuilder
         if (is_callable($callable)) {
             $callable($this->app->get(Router::class));
         }
+
+        return $this;
+    }
+
+    public function withAuthentication(): self
+    {
+        $this->app->addServiceProvider(new AuthenticationServiceProvider());
 
         return $this;
     }

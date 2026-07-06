@@ -27,7 +27,6 @@ class Application extends Container
         }
 
         $this->registerBaseBindings();
-        $this->registerBaseServiceProviders();
     }
 
 
@@ -63,18 +62,13 @@ class Application extends Container
         $this->add('path.config', new Literal\StringArgument($this->basePath . '/config'));
     }
 
-    private function registerBaseServiceProviders(): void
-    {
-        $this->addServiceProvider(new AuthenticationServiceProvider());
-    }
-
     private function registerBaseBindings(): void
     {
         $this->addShared(ServerRequestInterface::class, [ServerRequestFactory::class, 'fromGlobals']);
         $this->addShared(Router::class, function () {
             $strategy = new \League\Route\Strategy\ApplicationStrategy;
             $strategy->setContainer($this);
-            return new Router()->setStrategy($strategy);
+            return (new Router())->setStrategy($strategy);
         });
         $this->addShared(SapiEmitter::class);
     }
