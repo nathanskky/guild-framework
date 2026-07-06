@@ -11,11 +11,11 @@
     "repositories": [
         {
             "type": "vcs",
-            "url": "git@github.iu.edu:nsrodrig/shadow-access.git"
+            "url": "https://github.com/nathanskky/shadow-access.git"
         }
     ],
     "require": {
-        "php": "~8.4.0",
+        "php": "~8.5.0",
         "shadow/access": "dev-develop",
         "league/container": "^5.1",
         "league/route": "^6.2",
