@@ -2,6 +2,9 @@
 
 namespace Shadow\Framework;
 
+use Illuminate\Container\Container;
+use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Events\Dispatcher;
 use Shadow\Framework\ServiceProvider\AuthenticationServiceProvider;
 
 class ApplicationBuilder
@@ -9,12 +12,9 @@ class ApplicationBuilder
     public function __construct(private Application $app)
     {}
 
-    public function withRouting(?string $routesFilePath = null): self
+    public function addRouting(): self
     {
-        $routesFilePath = match (true) {
-            is_string($routesFilePath) => $routesFilePath,
-            default => $this->app->get('path.base') . '/routes/routes.php'
-        };
+        $routesFilePath = $this->app->get('path.base') . '/routes/routes.php';
 
         $callable = require $routesFilePath;
 
@@ -25,9 +25,26 @@ class ApplicationBuilder
         return $this;
     }
 
-    public function withAuthentication(): self
+    public function addAuthentication(): self
     {
         $this->app->addServiceProvider(new AuthenticationServiceProvider());
+
+        return $this;
+    }
+
+    public function addIlluminateDatabase(): self
+    {
+        $configFilePath = $this->app->get('path.config') . '/database.php';
+
+        $config = require $configFilePath;
+
+        $capsule = new Capsule;
+        $capsule->addConnection($config);
+        $capsule->setEventDispatcher(new Dispatcher(new Container()));
+        $capsule->setAsGlobal();
+        $capsule->bootEloquent();
+
+        $this->app->addShared(Capsule::class, $capsule);
 
         return $this;
     }
