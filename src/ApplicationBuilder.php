@@ -2,10 +2,13 @@
 
 namespace Guild\Framework;
 
+use Error;
+use Guild\Framework\Exception\ConfigurationException;
 use Illuminate\Container\Container;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Events\Dispatcher;
 use Guild\Framework\ServiceProvider\AuthenticationServiceProvider;
+use League\Container\ReflectionContainer;
 
 readonly class ApplicationBuilder
 {
@@ -27,7 +30,18 @@ readonly class ApplicationBuilder
 
     public function addAuthentication(): self
     {
-        $this->app->addServiceProvider(new AuthenticationServiceProvider());
+        $configFilePath = $this->app->get('path.config') . '/authentication.php';
+
+        try {
+            $config = require $configFilePath;
+        } catch (Error $error) {
+            throw new ConfigurationException(
+                'Problem encountered while attempting to read authentication config file: '
+                . $error->getMessage()
+            );
+        }
+
+        $this->app->addServiceProvider(new AuthenticationServiceProvider($config));
 
         return $this;
     }
@@ -36,7 +50,14 @@ readonly class ApplicationBuilder
     {
         $configFilePath = $this->app->get('path.config') . '/database.php';
 
-        $config = require $configFilePath;
+        try {
+            $config = require $configFilePath;
+        } catch (Error $error) {
+            throw new ConfigurationException(
+                'Problem encountered while attempting to read database config file: '
+                . $error->getMessage()
+            );
+        }
 
         $capsule = new Capsule;
         $capsule->addConnection($config);
@@ -45,6 +66,13 @@ readonly class ApplicationBuilder
         $capsule->bootEloquent();
 
         $this->app->addShared(Capsule::class, $capsule);
+
+        return $this;
+    }
+
+    public function enableAutoWiring(): self
+    {
+        $this->app->delegate(new ReflectionContainer(cacheResolutions: true));
 
         return $this;
     }
