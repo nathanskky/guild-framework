@@ -1,5 +1,5 @@
 {
-    "name": "shadow/framework",
+    "name": "guild/framework",
     "description": "IU-centric PHP framework for small projects.",
     "type": "library",
     "authors": [
@@ -11,12 +11,12 @@
     "repositories": [
         {
             "type": "vcs",
-            "url": "https://github.com/nathanskky/shadow-access.git"
+            "url": "https://github.com/nathanskky/guild-access.git"
         }
     ],
     "require": {
         "php": "~8.5.0",
-        "shadow/access": "dev-develop",
+        "guild/access": "^1.0",
         "league/container": "^5.1",
         "league/route": "^6.2",
         "laminas/laminas-diactoros": "^3.6",
@@ -29,12 +29,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Shadow\\Framework\\": "src"
+            "Guild\\Framework\\": "src"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Shadow\\Framework\\Test\\": "tests"
+            "Guild\\Framework\\Test\\": "tests"
         }
     }
 }

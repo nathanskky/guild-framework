@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Shadow\Framework\Exception;
+namespace Guild\Framework\Exception;
 
 use LogicException;
 

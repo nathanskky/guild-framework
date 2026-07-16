@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Shadow\Framework;
+namespace Guild\Framework;
 
 use League\Route\Router as LeagueRouter;
 

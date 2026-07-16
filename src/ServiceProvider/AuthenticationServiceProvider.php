@@ -1,15 +1,15 @@
 <?php declare(strict_types=1);
 
-namespace Shadow\Framework\ServiceProvider;
+namespace Guild\Framework\ServiceProvider;
 
 use Error;
 use League\Container\ServiceProvider\AbstractServiceProvider;
 use League\Container\ServiceProvider\BootableServiceProviderInterface;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
-use Shadow\Access\Authentication\AuthenticationConfigurationInterface;
-use Shadow\Access\Authentication\AuthenticationMiddleware;
-use Shadow\Framework\Exception\ConfigurationException;
+use Guild\Access\Authentication\AuthenticationConfigurationInterface;
+use Guild\Access\Authentication\AuthenticationMiddleware;
+use Guild\Framework\Exception\ConfigurationException;
 
 class AuthenticationServiceProvider extends AbstractServiceProvider implements BootableServiceProviderInterface
 {

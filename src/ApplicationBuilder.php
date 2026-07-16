@@ -1,11 +1,11 @@
 <?php declare(strict_types=1);
 
-namespace Shadow\Framework;
+namespace Guild\Framework;
 
 use Illuminate\Container\Container;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Events\Dispatcher;
-use Shadow\Framework\ServiceProvider\AuthenticationServiceProvider;
+use Guild\Framework\ServiceProvider\AuthenticationServiceProvider;
 
 class ApplicationBuilder
 {

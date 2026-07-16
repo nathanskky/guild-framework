@@ -1,5 +1,6 @@
+.idea/
 docker/
+html/
 public/
+tmp/
 vendor/
-
-.env
