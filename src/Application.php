@@ -4,10 +4,10 @@ namespace Guild\Framework;
 
 use Laminas\Diactoros\ServerRequestFactory;
 use Laminas\HttpHandlerRunner\Emitter\SapiEmitter;
-use League\Container\Argument\Literal;
+use League\Container\Argument\Literal\StringArgument;
 use League\Container\Container;
+use League\Route\Strategy\ApplicationStrategy;
 use Psr\Http\Message\ServerRequestInterface;
-use Guild\Framework\ServiceProvider\AuthenticationServiceProvider;
 
 class Application extends Container
 {
@@ -58,17 +58,17 @@ class Application extends Container
     private function bindPathsInContainer(): void
     {
         // TODO
-        $this->add('path.base', new Literal\StringArgument($this->basePath));
-        $this->add('path.config', new Literal\StringArgument($this->basePath . '/config'));
+        $this->add('path.base', new StringArgument($this->basePath));
+        $this->add('path.config', new StringArgument($this->basePath . '/config'));
     }
 
     private function registerBaseBindings(): void
     {
         $this->addShared(ServerRequestInterface::class, [ServerRequestFactory::class, 'fromGlobals']);
         $this->addShared(Router::class, function () {
-            $strategy = new \League\Route\Strategy\ApplicationStrategy;
+            $strategy = new ApplicationStrategy;
             $strategy->setContainer($this);
-            return (new Router())->setStrategy($strategy);
+            return new Router()->setStrategy($strategy);
         });
         $this->addShared(SapiEmitter::class);
     }

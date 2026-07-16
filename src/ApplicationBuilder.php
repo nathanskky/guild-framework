@@ -7,7 +7,7 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Events\Dispatcher;
 use Guild\Framework\ServiceProvider\AuthenticationServiceProvider;
 
-class ApplicationBuilder
+readonly class ApplicationBuilder
 {
     public function __construct(private Application $app)
     {}
