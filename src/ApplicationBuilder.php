@@ -3,6 +3,7 @@
 namespace Guild\Framework;
 
 use Error;
+use Guild\Access\Authentication\OIDC\OidcConfiguration;
 use Guild\Framework\Exception\ConfigurationException;
 use Illuminate\Container\Container;
 use Illuminate\Database\Capsule\Manager as Capsule;
@@ -17,7 +18,7 @@ readonly class ApplicationBuilder
 
     public function addRouting(): self
     {
-        $routesFilePath = $this->app->get('path.base') . '/routes/routes.php';
+        $routesFilePath = $this->app->getPath('base') . '/routes/routes.php';
 
         $callable = require $routesFilePath;
 
@@ -30,7 +31,7 @@ readonly class ApplicationBuilder
 
     public function addAuthentication(): self
     {
-        $configFilePath = $this->app->get('path.config') . '/authentication.php';
+        $configFilePath = $this->app->getPath('config') . '/authentication.php';
 
         try {
             $config = require $configFilePath;
@@ -41,6 +42,10 @@ readonly class ApplicationBuilder
             );
         }
 
+        if (! $config instanceof OidcConfiguration) {
+            throw new ConfigurationException('Authentication configuration file must return an instance of OidcConfiguration.');
+        }
+
         $this->app->addServiceProvider(new AuthenticationServiceProvider($config));
 
         return $this;
@@ -48,7 +53,7 @@ readonly class ApplicationBuilder
 
     public function addIlluminateDatabase(): self
     {
-        $configFilePath = $this->app->get('path.config') . '/database.php';
+        $configFilePath = $this->app->getPath('config') . '/database.php';
 
         try {
             $config = require $configFilePath;
@@ -57,6 +62,10 @@ readonly class ApplicationBuilder
                 'Problem encountered while attempting to read database config file: '
                 . $error->getMessage()
             );
+        }
+
+        if (!is_array($config)) {
+            throw new ConfigurationException('Database configuration file must return an array.');
         }
 
         $capsule = new Capsule;
@@ -70,9 +79,9 @@ readonly class ApplicationBuilder
         return $this;
     }
 
-    public function enableAutoWiring(): self
+    public function enableAutoWiring(bool $cacheResolutions = true): self
     {
-        $this->app->delegate(new ReflectionContainer(cacheResolutions: true));
+        $this->app->delegate(new ReflectionContainer(cacheResolutions: $cacheResolutions));
 
         return $this;
     }

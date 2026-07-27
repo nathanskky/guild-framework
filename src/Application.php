@@ -9,7 +9,7 @@ use League\Container\Container;
 use League\Route\Strategy\ApplicationStrategy;
 use Psr\Http\Message\ServerRequestInterface;
 
-class Application extends Container
+final class Application extends Container
 {
     /**
      * The base path for the application installation.
@@ -32,7 +32,7 @@ class Application extends Container
 
     public static function configure(string $basePath): ApplicationBuilder
     {
-        return new ApplicationBuilder(new static($basePath));
+        return new ApplicationBuilder(new self($basePath));
     }
 
     /**
@@ -48,6 +48,14 @@ class Application extends Container
         $this->bindPathsInContainer();
 
         return $this;
+    }
+
+    public function getPath(string $resource): ?string
+    {
+        /** @var ?string $path */
+        $path = $this->get('path.' . strtolower($resource));
+
+        return is_string($path) ? $path : null;
     }
 
     /**
@@ -75,9 +83,17 @@ class Application extends Container
 
     public function run(): void
     {
+        /** @var Router $router */
         $router = $this->get(Router::class);
-        $response = $router->dispatch($this->get(ServerRequestInterface::class));
+
+        /** @var SapiEmitter $emitter */
         $emitter = $this->get(SapiEmitter::class);
+
+        /** @var ServerRequestInterface $request */
+        $request = $this->get(ServerRequestInterface::class);
+
+        $response = $router->dispatch($request);
+
         $emitter->emit($response);
     }
 }
