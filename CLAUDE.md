@@ -16,9 +16,10 @@ vendor/bin/phpstan analyse        # static analysis (level 10, scoped to src/ �
 vendor/bin/phpunit                # run tests
 ```
 
-There is no `phpunit.xml` yet, and `tests/` is currently empty — `phpunit.xml` will need to be added (or a
-bootstrap/path passed to `vendor/bin/phpunit`) before tests can run. Test classes belong under the
-`Guild\Framework\Test\` namespace (autoload-dev maps this to `tests/`).
+`tests/` is currently empty. Test classes belong under the `Guild\Framework\Test\` namespace (autoload-dev maps
+this to `tests/`). `phpunit.xml` runs the `default` suite against `tests/`, scopes coverage to `src/`, and is
+strict: `requireCoverageMetadata`, `failOnRisky`, `failOnWarning`, and `failOnPhpunitDeprecation` are all on — new
+tests need `#[CoversClass]`/`#[CoversMethod]` (or equivalent) coverage attributes, or the run fails.
 
 ## Architecture
 
