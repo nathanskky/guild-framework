@@ -1,6 +1,11 @@
+.claude/
 .idea/
+.miller/
+.phpunit.cache/
 docker/
 html/
 public/
 tmp/
 vendor/
+
+.julieignore
