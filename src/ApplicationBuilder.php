@@ -5,6 +5,7 @@ namespace Guild\Framework;
 use Error;
 use Guild\Access\Authentication\OIDC\OidcConfiguration;
 use Guild\Framework\Exception\ConfigurationException;
+use Guild\Framework\ServiceProvider\ViewServiceProvider;
 use Illuminate\Container\Container;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Events\Dispatcher;
@@ -75,6 +76,13 @@ readonly class ApplicationBuilder
         $capsule->bootEloquent();
 
         $this->app->addShared(Capsule::class, $capsule);
+
+        return $this;
+    }
+
+    public function addTemplateEngine(TemplateEngine $engine): self
+    {
+        $this->app->addServiceProvider(new ViewServiceProvider($engine));
 
         return $this;
     }
