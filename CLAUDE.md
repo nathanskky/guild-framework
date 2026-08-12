@@ -28,6 +28,7 @@ The framework wires together several third-party libraries into one application 
 - **`league/route`** — HTTP routing (`Router` extends `League\Route\Router`)
 - **`laminas/laminas-diactoros`** + **`laminas/laminas-httphandlerrunner`** — PSR-7 request/emitter
 - **`illuminate/database`** + **`illuminate/events`** — Eloquent, used standalone via `Capsule`
+- **`twig/twig`** + **`latte/latte`** — optional template engines behind `View`/`TemplateEngine`
 - **`guild/access`** (sibling first-party package, pulled from `github.com/nathanskky/guild-access`) — OIDC
   authentication primitives (`OidcConfiguration`, `OidcAuthenticationService`, `OidcAuthenticationMiddleware`)
 
@@ -58,6 +59,12 @@ Application::configure($basePath)
   it in the container.
 - `ApplicationBuilder::enableAutoWiring()` adds a `League\Container\ReflectionContainer` as a delegate, so
   constructor-injectable classes not explicitly bound can still be resolved.
+- `ApplicationBuilder::addTemplateEngine(TemplateEngine $engine)` registers `ViewServiceProvider`, which lazily
+  binds `View::class` plus whichever backing engine matches the passed `TemplateEngine` case (`Twig` →
+  `Twig\Environment`/`FilesystemLoader`; `Latte` → `Latte\Engine`/`FileLoader`). Unlike `addAuthentication()`/
+  `addIlluminateDatabase()`, this takes the enum directly as an argument rather than reading a config file — there
+  is no `config/view.php`. Both engines load templates from `{basePath}/templates` by convention. `View::render()`
+  dispatches to `Environment::render()` or `Engine::renderToString()` depending on which engine is bound.
 - Any failure reading/validating one of these config files throws `Guild\Framework\Exception\ConfigurationException`
   (a `LogicException`) rather than letting the underlying parse/type error propagate raw.
 
@@ -82,3 +89,4 @@ rather than resolving paths itself, so any new config-driven `add*` method shoul
   class isn't meant to be extended/mutated by consumers.
 - Consuming applications are expected to supply `config/authentication.php`, `config/database.php`, and
   `routes/routes.php` under their own `$basePath` — these are load-bearing conventions, not optional files.
+  If `addTemplateEngine()` is used, a `templates/` directory under `$basePath` is expected too.
