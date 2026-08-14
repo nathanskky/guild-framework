@@ -10,10 +10,12 @@ class GroupsRolesTable extends AbstractMigration
 
         $table
             ->addColumn('group_id', 'integer', [
-                'null' => false
+                'null' => false,
+                'signed' => false
             ])
             ->addColumn('role_id', 'integer', [
-                'null' => false
+                'null' => false,
+                'signed' => false
             ])
             ->addColumn('created_by', 'string', [
                 'null' => false,

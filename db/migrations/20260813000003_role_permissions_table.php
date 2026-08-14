@@ -10,7 +10,8 @@ class RolePermissionsTable extends AbstractMigration
 
         $table
             ->addColumn('role_id', 'integer', [
-                'null' => false
+                'null' => false,
+                'signed' => false
             ])
             ->addColumn('name', 'string', [
                 'null' => false,
