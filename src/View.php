@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Guild\Framework;
 
@@ -10,7 +12,9 @@ use Twig\Error\SyntaxError;
 
 readonly class View
 {
-    public function __construct(public Environment|Engine $templateEngine) {}
+    public function __construct(public Environment|Engine $templateEngine)
+    {
+    }
 
     /**
      * @throws SyntaxError

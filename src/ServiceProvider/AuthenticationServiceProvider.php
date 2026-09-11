@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Guild\Framework\ServiceProvider;
 
@@ -11,7 +13,8 @@ use Psr\Log\LoggerInterface;
 class AuthenticationServiceProvider extends AbstractServiceProvider
 {
     public function __construct(private readonly OidcConfiguration $config)
-    {}
+    {
+    }
 
     public function provides(string $id): bool
     {

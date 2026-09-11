@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 use Guild\Framework\Application;
 use Illuminate\Database\Capsule\Manager;

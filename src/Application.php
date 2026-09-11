@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Guild\Framework;
 
@@ -74,7 +76,7 @@ final class Application extends Container
     {
         $this->addShared(ServerRequestInterface::class, [ServerRequestFactory::class, 'fromGlobals']);
         $this->addShared(Router::class, function () {
-            $strategy = new ApplicationStrategy;
+            $strategy = new ApplicationStrategy();
             $strategy->setContainer($this);
             return new Router()->setStrategy($strategy);
         });

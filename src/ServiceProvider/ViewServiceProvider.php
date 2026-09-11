@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Guild\Framework\ServiceProvider;
 
@@ -13,7 +15,8 @@ use Twig\Loader\FilesystemLoader;
 class ViewServiceProvider extends AbstractServiceProvider
 {
     public function __construct(private readonly TemplateEngine $templateEngine)
-    {}
+    {
+    }
 
     public function provides(string $id): bool
     {
@@ -47,19 +50,27 @@ class ViewServiceProvider extends AbstractServiceProvider
         });
 
         if ($this->templateEngine === TemplateEngine::Twig) {
-            $container->addShared(FilesystemLoader::class, fn () =>
+            $container->addShared(
+                FilesystemLoader::class,
+                fn () =>
                 new FilesystemLoader($container->getPath('base') . '/templates')
             );
-            $container->addShared(Environment::class, fn () =>
+            $container->addShared(
+                Environment::class,
+                fn () =>
                 new Environment($container->get(FilesystemLoader::class))
             );
         }
 
         if ($this->templateEngine === TemplateEngine::Latte) {
-            $container->addShared(FileLoader::class, fn () =>
+            $container->addShared(
+                FileLoader::class,
+                fn () =>
                 new FileLoader($container->getPath('base') . '/templates')
             );
-            $container->addShared(Engine::class, fn () =>
+            $container->addShared(
+                Engine::class,
+                fn () =>
                 new Engine()->setLoader($container->get(FileLoader::class))
             );
         }

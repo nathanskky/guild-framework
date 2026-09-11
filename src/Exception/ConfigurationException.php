@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Guild\Framework\Exception;
 
@@ -9,4 +11,5 @@ use LogicException;
  * a configuration file, such as /config/app.php or /config/authentication.php.
  */
 class ConfigurationException extends LogicException
-{}
+{
+}
