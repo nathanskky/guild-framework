@@ -164,11 +164,6 @@ apply it, `composer format:check` to verify without writing. Its rules are autho
 enforces — don't hand-fix a style issue Pint would catch, and don't fight its output. The patterns below are
 *observed*, not a style guide, and now cover only what Pint doesn't decide.
 
-- **`<?php declare(strict_types=1);` is split onto its own line** (PSR-12 §3) — Pint enforces this. The
-  workspace previously used a one-line `<?php declare(strict_types=1);`, which conflicted with PSR-12; Pint's
-  initial run corrected it everywhere. Don't collapse it back to one line.
-- **Empty class/method bodies are two-line** (`{` then `}` on its own line) — Pint's PSR-12 preset expands
-  what used to be a hugged `{}` on the same line. Don't hand-collapse it back.
 - **Use `final` and `readonly` where they make sense for the class in front of you** — not to match what
   neighboring classes or sibling packages happen to do. Today `Application` is `final`, `ApplicationBuilder`
   and `View` are `readonly`, and `Router`, `ConfigurationException`, the service providers, and the models
