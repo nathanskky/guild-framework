@@ -159,10 +159,10 @@ Two details are specific to this project and worth knowing up front:
 
 ## Conventions
 
-**A formatter has landed: Laravel Pint, PSR-12 preset, configured in `pint.json`.** Run `composer format` to
-apply it, `composer format:check` to verify without writing. Its rules are authoritative for anything it
-enforces — don't hand-fix a style issue Pint would catch, and don't fight its output. The patterns below are
-*observed*, not a style guide, and now cover only what Pint doesn't decide.
+**This repo is formatted with Laravel Pint (PSR-12 preset), configured in `pint.json`.** Run `composer
+format` to apply it, `composer format:check` to verify without writing. Its rules are authoritative for
+anything it enforces — don't hand-fix a style issue Pint would catch, and don't fight its output. The
+patterns below are *observed*, not a style guide, and cover only what Pint doesn't decide.
 
 - **Use `final` and `readonly` where they make sense for the class in front of you** — not to match what
   neighboring classes or sibling packages happen to do. Today `Application` is `final`, `ApplicationBuilder`
