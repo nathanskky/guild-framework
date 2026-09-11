@@ -40,5 +40,18 @@
         "psr-4": {
             "Guild\\Framework\\Test\\": "tests"
         }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "analyse": "phpstan analyse",
+        "check": [
+            "@test",
+            "@analyse"
+        ]
+    },
+    "scripts-descriptions": {
+        "test": "Run the test suite (fails if no tests run - tests/ is currently empty).",
+        "analyse": "Run PHPStan at level 10 over src/.",
+        "check": "Run tests then static analysis. Stops at the first failure."
     }
 }
