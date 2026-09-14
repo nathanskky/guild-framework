@@ -14,6 +14,15 @@ use Psr\Http\Message\ServerRequestInterface;
 final class Application extends Container
 {
     /**
+     * The template engine this application was configured with, if any.
+     *
+     * Remembered here rather than inferred from the container: with autowiring enabled a
+     * reflection delegate reports almost any class as available, so asking the container
+     * whether an engine is bound would answer yes even when none was chosen.
+     */
+    private ?TemplateEngine $templateEngine = null;
+
+    /**
      * The base path for the application installation.
      *
      * @var string
@@ -81,6 +90,16 @@ final class Application extends Container
             return new Router()->setStrategy($strategy);
         });
         $this->addShared(SapiEmitter::class);
+    }
+
+    public function setTemplateEngine(TemplateEngine $engine): void
+    {
+        $this->templateEngine = $engine;
+    }
+
+    public function getTemplateEngine(): ?TemplateEngine
+    {
+        return $this->templateEngine;
     }
 
     public function run(): void

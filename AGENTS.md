@@ -85,6 +85,7 @@ The framework wires several third-party libraries into one application container
 - **`twig/twig`** + **`latte/latte`** — optional template engines behind `View`/`TemplateEngine`
 - **`robmorgan/phinx`** — migrations
 - **`guild/access`** — OIDC authentication primitives
+- **`guild/rivet`** — IU Rivet Design System components for both engines
 
 ### Bootstrap flow
 
@@ -112,6 +113,15 @@ Application::configure($basePath)
   array. It boots a global `Illuminate\Database\Capsule\Manager` and shares it in the container.
 - `enableAutoWiring()` adds a `League\Container\ReflectionContainer` as a delegate, so
   constructor-injectable classes that aren't explicitly bound can still be resolved.
+- `addRivet()` registers `RivetServiceProvider`, making the Rivet components available as
+  tags in whichever engine was chosen. It reads that choice from `Application::getTemplateEngine()`,
+  so **it must be called after `addTemplateEngine()`** and throws `ConfigurationException`
+  if it is not. Like `addTemplateEngine()` it reads no config file.
+  **`RivetServiceProvider` is deliberately eager** — it implements
+  `BootableServiceProviderInterface` and does its work in `boot()`. A lazy provider only
+  registers when something asks for a service it declares, and nothing ever asks for
+  these: templates reach the components through the engine. Left lazy, the extension
+  would never be added and every `{% rvt_* %}` tag would fail as an unknown tag.
 - `addTemplateEngine(TemplateEngine $engine)` registers `ViewServiceProvider`, binding `View::class` plus
   whichever backing engine matches the enum case (`Twig` → `Twig\Environment`/`FilesystemLoader`; `Latte` →
   `Latte\Engine`/`FileLoader`). Unlike the two methods above, this **takes the enum directly rather than
@@ -198,6 +208,7 @@ that file:
 | `addAuthentication()` | `config/authentication.php` |
 | `addIlluminateDatabase()` | `config/database.php` |
 | `addTemplateEngine()` | none — takes the enum directly; renders from `templates/` |
+| `addRivet()` | none — but requires `addTemplateEngine()` to have been called first |
 | `enableAutoWiring()` | none |
 
 `guild/starter` is the worked example: it does not call `addAuthentication()`, so its

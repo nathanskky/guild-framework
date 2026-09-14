@@ -11,6 +11,10 @@
     "repositories": [
         {
             "type": "vcs",
+            "url": "https://github.com/nathanskky/guild-rivet.git"
+        },
+        {
+            "type": "vcs",
             "url": "https://github.com/nathanskky/guild-access.git"
         }
     ],
@@ -25,7 +29,8 @@
         "illuminate/events": "^13.19",
         "twig/twig": "^3.28",
         "latte/latte": "^3.1",
-        "robmorgan/phinx": "^0.16.12"
+        "robmorgan/phinx": "^0.16.12",
+        "guild/rivet": "dev-develop"
     },
     "require-dev": {
         "phpunit/phpunit": "^13.0",

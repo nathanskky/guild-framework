@@ -1,10 +1,13 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Guild\Framework;
 
 use Error;
 use Guild\Access\Authentication\OIDC\OidcConfiguration;
 use Guild\Framework\Exception\ConfigurationException;
+use Guild\Framework\ServiceProvider\RivetServiceProvider;
 use Guild\Framework\ServiceProvider\ViewServiceProvider;
 use Illuminate\Container\Container;
 use Illuminate\Database\Capsule\Manager as Capsule;
@@ -15,7 +18,8 @@ use League\Container\ReflectionContainer;
 readonly class ApplicationBuilder
 {
     public function __construct(private Application $app)
-    {}
+    {
+    }
 
     public function addRouting(): self
     {
@@ -52,6 +56,18 @@ readonly class ApplicationBuilder
         return $this;
     }
 
+    public function addAuthorization(): self
+    {
+        // TODO: consider throwing exception if authentication not added yet.
+
+        // TODO
+        $this->app->addServiceProvider(new AuthorizationServiceProvider());
+
+        // TODO: register routes for authorization endpoints (e.g., /permissions, /roles, /groups)
+
+        return $this;
+    }
+
     public function addIlluminateDatabase(): self
     {
         $configFilePath = $this->app->getPath('config') . '/database.php';
@@ -69,7 +85,7 @@ readonly class ApplicationBuilder
             throw new ConfigurationException('Database configuration file must return an array.');
         }
 
-        $capsule = new Capsule;
+        $capsule = new Capsule();
         $capsule->addConnection($config);
         $capsule->setEventDispatcher(new Dispatcher(new Container()));
         $capsule->setAsGlobal();
@@ -82,7 +98,30 @@ readonly class ApplicationBuilder
 
     public function addTemplateEngine(TemplateEngine $engine): self
     {
+        $this->app->setTemplateEngine($engine);
         $this->app->addServiceProvider(new ViewServiceProvider($engine));
+
+        return $this;
+    }
+
+    /**
+     * Make the Rivet Design System components available to the template engine.
+     *
+     * Takes no configuration file, like addTemplateEngine(). It does require one though:
+     * the components are registered against whichever engine was chosen, so this must
+     * come after addTemplateEngine().
+     */
+    public function addRivet(): self
+    {
+        $engine = $this->app->getTemplateEngine();
+
+        if ($engine === null) {
+            throw new ConfigurationException(
+                'addRivet() needs a template engine to register the components with. Call addTemplateEngine() first.'
+            );
+        }
+
+        $this->app->addServiceProvider(new RivetServiceProvider($engine));
 
         return $this;
     }
