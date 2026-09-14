@@ -18,7 +18,7 @@ standalone**.
 
 ## Sibling packages
 
-These four repos are developed side by side but are **four independent git repos**. There is no root
+These repos are developed side by side but are **independent git repos**. There is no root
 `composer.json` and no root git repository, so each is cloned and installed on its own. Do not invent
 root-level tooling or a shared root autoloader.
 
@@ -28,6 +28,7 @@ root-level tooling or a shared root autoloader.
 | `guild/access` | `Guild\Access\` | IU Login (OIDC) authentication library. **This package depends on it** (`^1.0`, via VCS repo) |
 | `guild/starter` | `Guild\Starter\` | Runnable example app; the primary consumer of this package |
 | `iu/notifications` | `IU\Notifications\` | IU Notifications API client. Fully independent — different GitHub host, and its `<8.5` PHP constraint is mutually exclusive with this package's `~8.5.0` |
+| `guild/rivet` | `Guild\Rivet\` | IU Rivet Design System components. Will be exposed via `ApplicationBuilder::addRivet()` |
 
 `access/README.md` is the authoritative reference for the OIDC library's config fields, redirect-safety
 rules, session handling, and error types. Read it before touching anything auth-related here.
@@ -261,7 +262,7 @@ feature branch  --PR-->  develop  --PR-->  main  --> tag (release)
   accumulated work is ready to release.
 - **Tags are applied to `main`** after that merge.
 
-This is the intended model across all four Guild packages. This package has not reached v1 yet, so `main`
+This is the intended model across all the Guild packages. This package has not reached v1 yet, so `main`
 and tagging are not in use here today — but assume this flow for new work rather than inventing another.
 
 **One consequence specific to this package:** `guild/starter` requires `dev-develop`, which tracks the tip
