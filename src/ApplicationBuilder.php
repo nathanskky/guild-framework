@@ -9,6 +9,7 @@ use Guild\Access\Authentication\OIDC\OidcConfiguration;
 use Guild\Framework\Exception\ConfigurationException;
 use Guild\Framework\ServiceProvider\RivetServiceProvider;
 use Guild\Framework\ServiceProvider\ViewServiceProvider;
+use Guild\Rivet\Page\PageDefaults;
 use Illuminate\Container\Container;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Events\Dispatcher;
@@ -98,8 +99,12 @@ readonly class ApplicationBuilder
      * Takes no configuration file, like addTemplateEngine(). It does require one though:
      * the components are registered against whichever engine was chosen, so this must
      * come after addTemplateEngine().
+     *
+     * The optional PageDefaults is passed through to the renderer for the rvt_page
+     * layout component to read application-wide values (app title, navigation, footer
+     * links) from.
      */
-    public function addRivet(): self
+    public function addRivet(?PageDefaults $pageDefaults = null): self
     {
         $engine = $this->app->getTemplateEngine();
 
@@ -109,7 +114,7 @@ readonly class ApplicationBuilder
             );
         }
 
-        $this->app->addServiceProvider(new RivetServiceProvider($engine));
+        $this->app->addServiceProvider(new RivetServiceProvider($engine, $pageDefaults));
 
         return $this;
     }

@@ -122,6 +122,10 @@ Application::configure($basePath)
   registers when something asks for a service it declares, and nothing ever asks for
   these: templates reach the components through the engine. Left lazy, the extension
   would never be added and every `{% rvt_* %}` tag would fail as an unknown tag.
+  It optionally takes a `PageDefaults`, which the `rvt_page` layout component requires.
+  Passed explicitly rather than read from a config file: an *optional* config file is not
+  a pattern this repo has, and an application that wants its defaults in a file can
+  `require` one at the call site.
 - `addTemplateEngine(TemplateEngine $engine)` registers `ViewServiceProvider`, binding `View::class` plus
   whichever backing engine matches the enum case (`Twig` → `Twig\Environment`/`FilesystemLoader`; `Latte` →
   `Latte\Engine`/`FileLoader`). Unlike the two methods above, this **takes the enum directly rather than

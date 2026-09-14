@@ -6,6 +6,7 @@ namespace Guild\Framework\ServiceProvider;
 
 use Guild\Framework\TemplateEngine;
 use Guild\Rivet\Latte\RivetExtension as LatteRivetExtension;
+use Guild\Rivet\Page\PageDefaults;
 use Guild\Rivet\Render\ComponentRegistry;
 use Guild\Rivet\Render\Renderer;
 use Guild\Rivet\Rivet;
@@ -36,8 +37,10 @@ use Twig\RuntimeLoader\ContainerRuntimeLoader;
  */
 class RivetServiceProvider extends AbstractServiceProvider implements BootableServiceProviderInterface
 {
-    public function __construct(private readonly TemplateEngine $templateEngine)
-    {
+    public function __construct(
+        private readonly TemplateEngine $templateEngine,
+        private readonly ?PageDefaults $pageDefaults = null,
+    ) {
     }
 
     public function boot(): void
@@ -49,7 +52,7 @@ class RivetServiceProvider extends AbstractServiceProvider implements BootableSe
         // that makes ViewServiceProvider the worst offender in this repo's static
         // analysis. These are cheap objects; constructing them directly keeps the types.
         $registry = Rivet::registry();
-        $renderer = new Renderer($registry);
+        $renderer = new Renderer($registry, pageDefaults: $this->pageDefaults);
 
         $container->addShared(ComponentRegistry::class, $registry);
         $container->addShared(Renderer::class, $renderer);
