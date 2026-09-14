@@ -56,18 +56,6 @@ readonly class ApplicationBuilder
         return $this;
     }
 
-    public function addAuthorization(): self
-    {
-        // TODO: consider throwing exception if authentication not added yet.
-
-        // TODO
-        $this->app->addServiceProvider(new AuthorizationServiceProvider());
-
-        // TODO: register routes for authorization endpoints (e.g., /permissions, /roles, /groups)
-
-        return $this;
-    }
-
     public function addIlluminateDatabase(): self
     {
         $configFilePath = $this->app->getPath('config') . '/database.php';
