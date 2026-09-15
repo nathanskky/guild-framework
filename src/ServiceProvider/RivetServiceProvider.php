@@ -31,6 +31,11 @@ use Twig\RuntimeLoader\ContainerRuntimeLoader;
  * The engine binding is extended rather than replaced. `extend()` forces the owning
  * provider to register first, so this works even though ViewServiceProvider is lazy.
  *
+ * `provides()` still declares the three services this binds. They are bound in `boot()`
+ * as container definitions, which the container resolves before it consults any
+ * provider — so the declaration changes no behaviour, but a provider that binds a
+ * service and denies providing it is lying about its own contract.
+ *
  * There is no per-request reset call. `Renderer::reset()` matters only where a process
  * outlives a request; this framework builds its container per request, so each one
  * already starts with a fresh renderer and identifiers numbered from one.
@@ -72,16 +77,28 @@ class RivetServiceProvider extends AbstractServiceProvider implements BootableSe
         }
     }
 
-    /**
-     * Nothing is provided lazily; boot() has already bound everything.
-     */
     public function provides(string $id): bool
     {
-        return false;
+        $services = [
+            ComponentRegistry::class,
+            Renderer::class,
+            RivetRuntime::class,
+        ];
+
+        return in_array($id, $services, true);
     }
 
+    /**
+     * Deliberately empty, and unreachable: boot() has already bound everything this
+     * provider declares, and the container resolves definitions before it consults
+     * providers, so the lazy path never runs.
+     *
+     * Moving the bindings here would be worse, not tidier. boot() must construct the
+     * renderer eagerly because the Latte extension captures it, so a later register()
+     * that rebound a fresh one would leave the container and the Latte extension holding
+     * different renderers with diverging identifier sequences.
+     */
     public function register(): void
     {
-        // Intentionally empty. See boot().
     }
 }
