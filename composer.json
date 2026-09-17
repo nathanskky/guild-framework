@@ -16,11 +16,16 @@
         {
             "type": "vcs",
             "url": "https://github.com/nathanskky/guild-access.git"
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/nathanskky/guild-grouper.git"
         }
     ],
     "require": {
         "php": "~8.5.0",
         "guild/access": "^1.0",
+        "guild/grouper": "^0.1",
         "league/container": "^5.1",
         "league/route": "^6.2",
         "laminas/laminas-diactoros": "^3.6",

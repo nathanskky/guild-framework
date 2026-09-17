@@ -26,6 +26,7 @@ root-level tooling or a shared root autoloader.
 |---|---|---|
 | `guild/framework` *(this one)* | `Guild\Framework\` | Application kernel / DI container |
 | `guild/access` | `Guild\Access\` | IU Login (OIDC) authentication library. **This package depends on it** (`^1.0`, via VCS repo) |
+| `guild/grouper` | `Guild\Grouper\` | Read-only IU Grouper group-membership lookup. **This package depends on it** (`^0.1`, via VCS repo). Pre-1.0 — treat minor releases as potentially breaking |
 | `guild/starter` | `Guild\Starter\` | Runnable example app; the primary consumer of this package |
 | `iu/notifications` | `IU\Notifications\` | IU Notifications API client. Fully independent — different GitHub host, and its `<8.5` PHP constraint is mutually exclusive with this package's `~8.5.0` |
 | `guild/rivet` | `Guild\Rivet\` | IU Rivet Design System components. Will be exposed via `ApplicationBuilder::addRivet()` |
@@ -85,6 +86,7 @@ The framework wires several third-party libraries into one application container
 - **`twig/twig`** + **`latte/latte`** — optional template engines behind `View`/`TemplateEngine`
 - **`robmorgan/phinx`** — migrations
 - **`guild/access`** — OIDC authentication primitives
+- **`guild/grouper`** — read-only Grouper group-membership lookup, for the authorization layer
 - **`guild/rivet`** — IU Rivet Design System components for both engines
 
 ### Bootstrap flow
@@ -244,8 +246,17 @@ that file:
   no existence check, so an unrecognized resource raises a container `NotFoundException` rather than
   returning `null` as its `?string` signature suggests. Only `path.base` and `path.config` are bound.
 - **The RBAC models and migrations are plumbing with nothing on top.** `src/Model/{Group,Role,RolePermission}.php`
-  and the four migrations are real and functional, but no service consumes them and no Grouper/ACM logic
-  exists anywhere in this package. Don't assume authorization works.
+  and the four migrations are real and functional, but no service consumes them. Don't assume
+  authorization works.
+- **`guild/grouper` is installed but not yet consumed.** The dependency resolves and autoloads, and
+  `Guild\Grouper\GrouperClient` is ready to use — but nothing in `src/` calls it, there is no
+  `GrouperServiceProvider`, and `ApplicationBuilder::addAuthorization()` is a stub whose body is TODOs
+  referencing an `AuthorizationServiceProvider` that does not exist. Adding the dependency was deliberately
+  separate from building the layer that uses it.
+- **`Guild\Framework\Authorization\GrouperService` is an empty class**, not a wrapper around
+  `guild/grouper`. Read `grouper/README.md` before filling it in — in particular, `groupsFor()` returns a
+  `GroupMembership|GrouperUnavailable` union that PHPStan will force you to narrow, and an empty membership
+  is a *successful* answer rather than a failure.
 
 ## Branching and pull requests
 
