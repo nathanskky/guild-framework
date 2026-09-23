@@ -29,6 +29,7 @@ class RolesTable extends AbstractMigration
                 'limit' => 8
             ])
             ->addTimestamps()
+            ->addIndex(['name'], ['unique' => true])
             ->create();
     }
 }

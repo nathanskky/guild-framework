@@ -15,10 +15,6 @@ class GroupsTable extends AbstractMigration
                 'null' => false,
                 'limit' => 255
             ])
-            ->addColumn('group_type', 'string', [
-                'null' => false,
-                'limit' => 255
-            ])
             ->addColumn('group_identifier', 'string', [
                 'null' => false,
                 'limit' => 255
@@ -37,6 +33,8 @@ class GroupsTable extends AbstractMigration
                 'limit' => 8
             ])
             ->addTimestamps()
+            ->addIndex(['group_identifier'], ['unique' => true])
+            ->addIndex(['name'], ['unique' => true])
             ->create();
     }
 }

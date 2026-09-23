@@ -18,16 +18,25 @@ class Role extends Model
         'active' => false
     ];
 
+    /**
+     * @return BelongsToMany<Group, $this>
+     */
     public function groups(): BelongsToMany
     {
         return $this->belongsToMany(Group::class, 'framework_groups_roles');
     }
 
+    /**
+     * @return HasMany<RolePermission, $this>
+     */
     public function permissions(): HasMany
     {
         return $this->hasMany(RolePermission::class);
     }
 
+    /**
+     * @param  Builder<self>  $query
+     */
     #[Scope]
     protected function active(Builder $query): void
     {

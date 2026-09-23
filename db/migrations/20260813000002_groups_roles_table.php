@@ -29,6 +29,7 @@ class GroupsRolesTable extends AbstractMigration
                 'limit' => 8
             ])
             ->addTimestamps()
+            ->addIndex(['group_id', 'role_id'], ['unique' => true])
             ->create();
 
         $table

@@ -17,11 +17,17 @@ class RolePermission extends Model
         'active' => false
     ];
 
+    /**
+     * @return BelongsTo<Role, $this>
+     */
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
     }
 
+    /**
+     * @param  Builder<self>  $query
+     */
     #[Scope]
     protected function active(Builder $query): void
     {

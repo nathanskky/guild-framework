@@ -33,6 +33,7 @@ class RolePermissionsTable extends AbstractMigration
                 'limit' => 8
             ])
             ->addTimestamps()
+            ->addIndex(['role_id', 'name'], ['unique' => true])
             ->create();
 
         $table
