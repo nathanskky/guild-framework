@@ -51,16 +51,15 @@ composer check         # test, then analyse, then style check; stops at the firs
 **`composer test` is green.** `phpunit.xml` sets `failOnEmptyTestSuite="true"`, so an empty run would
 report `No tests executed!` and exit non-zero rather than falsely exiting 0 — keep the flag.
 
-**`composer analyse` is red: 8 pre-existing errors on a clean checkout of `develop`.** All of them are in
+**`composer analyse` is red: 7 pre-existing errors on a clean checkout of `develop`.** All of them are in
 committed code, so you will see them on a fresh clone:
 
 - **7 in `ServiceProvider/ViewServiceProvider.php`** — two `method.notFound` on `$container->getPath()`,
   which is not declared on `DefinitionContainerInterface` (see [Landmines](#landmines)), plus five
   cascading errors where the resulting `mixed` flows into string concatenation and the Twig/Latte loader
   constructors.
-- **1 × `missingType.iterableValue`** on `View::render()`'s `$data` parameter.
 
-If your count is higher than 8, the extra errors are from uncommitted work in your tree — which is why
+If your count is higher than 7, the extra errors are from uncommitted work in your tree — which is why
 taking your own baseline before you start is still worth the ten seconds.
 
 **Tests are stricter than you expect.** `phpunit.xml` is the strictest config in the workspace:
@@ -147,7 +146,10 @@ Application::configure($basePath)
   `addAuthentication()`, because Apache authenticates before PHP runs. It registers
   `AuthorizationServiceProvider`, which lazily binds `UserResolver`, `Gate` and what they need.
   `$policies` is a flat list of policy classes, each declaring `#[HandlesResource]`; they are read and
-  validated on first use, never at boot, and resolved through the container. The grant lookup
+  validated on first use, never at boot, and resolved through the container. **Templates get `can()` and
+  `cannot()`** whenever a template engine is configured too — `addAuthorization()` and
+  `addTemplateEngine()` may be called in either order; whichever runs second registers the eager
+  `AuthorizationTemplateServiceProvider`. The grant lookup
   resolves the shared `Capsule`, so `addIlluminateDatabase()` must also have been called.
 - `withLogger(LoggerInterface $logger)` replaces the default logger (see below).
 - **Config failures are wrapped** in `Guild\Framework\Exception\ConfigurationException` (a `LogicException`)
@@ -269,7 +271,7 @@ that file:
 - **`Application::getPath()` throws on unknown resources.** It calls `$this->get('path.' . $resource)` with
   no existence check, so an unrecognized resource raises a container `NotFoundException` rather than
   returning `null` as its `?string` signature suggests. Only `path.base` and `path.config` are bound.
-- **Authorization has a user, a Gate and policies, but no template functions or admin UI yet.**
+- **Authorization has a user, a Gate, policies and template functions, but no admin UI yet.**
   `UserResolver::current()` returns a `User` or `null` for a guest. `Gate::allows()/denies()/authorize()`
   take a case of the application's `Permission` enum and an optional resource. Without a resource the
   user's roles decide; with one, the roles must grant the permission **and** the resource's policy method
@@ -279,6 +281,14 @@ that file:
   resource's exact class, no `#[Handles]` method for the permission, duplicates, a non-`bool` return, a
   case from another enum, or a first parameter that is not `User`/`?User`. The policy is resolved before
   any allow or deny decision, so a mistake cannot hide behind a user who lacks the grant.
+- **Templates name a permission by case or by stored value.** `can('documents.update', document)` and
+  `can(enum('App\\AppPermission').DocumentsUpdate, document)` (Twig) are equivalent; an unknown value
+  throws `ConfigurationException` at render. Templates are not statically analysed, so the value string
+  loses nothing a case would have caught.
+- **`View::render()` unwraps `AuthorizationUnavailableException`.** Twig wraps anything thrown inside a
+  template function in `Twig\Error\RuntimeError`; Latte does not. `View` rethrows the unavailable exception
+  as itself under both engines so an application's 503 handling sees it. Everything else stays wrapped,
+  keeping Twig's template name and line. Rendering through `Environment` directly bypasses this.
 - **Only Grouper membership is cached; grants are read fresh.** Membership lives in the PHP session under
   `guild_framework_membership` for the configured TTL, is served stale up to the stale cap while Grouper is
   unreachable (with a warning logged every time), and after that `AuthorizationUnavailableException` is

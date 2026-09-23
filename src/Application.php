@@ -33,6 +33,15 @@ final class Application extends Container
     private bool $authenticationAdded = false;
 
     /**
+     * The permission enum given to addAuthorization(), or null if it has not
+     * been called. Lets addTemplateEngine() add the template functions when it
+     * is called second.
+     *
+     * @var class-string<Authorization\Permission>|null
+     */
+    private ?string $authorizationPermissions = null;
+
+    /**
      * The base path for the application installation.
      *
      * @var string
@@ -125,6 +134,22 @@ final class Application extends Container
     public function isAuthenticationAdded(): bool
     {
         return $this->authenticationAdded;
+    }
+
+    /**
+     * @param  class-string<Authorization\Permission>  $permissionEnum
+     */
+    public function setAuthorizationPermissions(string $permissionEnum): void
+    {
+        $this->authorizationPermissions = $permissionEnum;
+    }
+
+    /**
+     * @return class-string<Authorization\Permission>|null
+     */
+    public function getAuthorizationPermissions(): ?string
+    {
+        return $this->authorizationPermissions;
     }
 
     public function run(): void

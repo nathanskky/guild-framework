@@ -20,10 +20,18 @@ use Guild\Framework\Authorization\UserResolver;
 use Guild\Framework\Exception\ConfigurationException;
 use Guild\Framework\ServiceProvider\AuthenticationServiceProvider;
 use Guild\Framework\ServiceProvider\AuthorizationServiceProvider;
+use Guild\Framework\ServiceProvider\AuthorizationTemplateServiceProvider;
+use Guild\Framework\ServiceProvider\ViewServiceProvider;
+use Guild\Framework\TemplateEngine;
+use Guild\Framework\View;
+use Guild\Framework\Authorization\TemplateAuthorization;
+use Guild\Framework\Twig\AuthorizationExtension as TwigAuthorizationExtension;
+use Guild\Framework\Latte\AuthorizationExtension as LatteAuthorizationExtension;
 use Guild\Framework\Test\Authorization\Support\Policy\DocumentPolicy;
 use Guild\Framework\Test\Authorization\Support\TestPermission;
 use Monolog\Logger;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -32,6 +40,12 @@ use Psr\Log\NullLogger;
 #[CoversClass(ApplicationBuilder::class)]
 #[CoversClass(Application::class)]
 #[CoversClass(AuthorizationServiceProvider::class)]
+#[CoversClass(AuthorizationTemplateServiceProvider::class)]
+#[UsesClass(ViewServiceProvider::class)]
+#[UsesClass(View::class)]
+#[UsesClass(TemplateAuthorization::class)]
+#[UsesClass(TwigAuthorizationExtension::class)]
+#[UsesClass(LatteAuthorizationExtension::class)]
 #[UsesClass(AuthenticationServiceProvider::class)]
 #[UsesClass(AuthorizationConfiguration::class)]
 #[UsesClass(UserResolver::class)]
@@ -50,6 +64,9 @@ final class ApplicationBuilderAuthorizationTest extends TestCase
     {
         $this->basePath = sys_get_temp_dir() . '/guild-framework-test-' . bin2hex(random_bytes(6));
         mkdir($this->basePath . '/config', recursive: true);
+        mkdir($this->basePath . '/templates');
+        file_put_contents($this->basePath . '/templates/check.twig', "{{ cannot('documents.update') ? 'guest' : 'user' }}");
+        file_put_contents($this->basePath . '/templates/check.latte', "{cannot('documents.update') ? 'guest' : 'user'}");
 
         $this->writeConfig('database.php', "return ['driver' => 'sqlite', 'database' => ':memory:'];");
         $this->writeConfig('authentication.php', <<<'PHP'
@@ -67,11 +84,12 @@ final class ApplicationBuilderAuthorizationTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (glob($this->basePath . '/config/*.php') ?: [] as $file) {
+        foreach ([...(glob($this->basePath . '/config/*') ?: []), ...(glob($this->basePath . '/templates/*') ?: [])] as $file) {
             unlink($file);
         }
 
         rmdir($this->basePath . '/config');
+        rmdir($this->basePath . '/templates');
         rmdir($this->basePath);
     }
 
@@ -95,6 +113,32 @@ final class ApplicationBuilderAuthorizationTest extends TestCase
 
         self::assertInstanceOf(Gate::class, $app->get(Gate::class), 'the gate is registered');
         self::assertSame($app->get(Gate::class), $app->get(Gate::class), 'and shared');
+    }
+
+    /**
+     * @return iterable<string, array{TemplateEngine, string, bool}>
+     */
+    public static function engineOrderings(): iterable
+    {
+        yield 'Twig, engine first' => [TemplateEngine::Twig, 'check.twig', true];
+        yield 'Twig, authorization first' => [TemplateEngine::Twig, 'check.twig', false];
+        yield 'Latte, engine first' => [TemplateEngine::Latte, 'check.latte', true];
+        yield 'Latte, authorization first' => [TemplateEngine::Latte, 'check.latte', false];
+    }
+
+    #[DataProvider('engineOrderings')]
+    public function testTemplatesGetCanAndCannotInEitherOrder(TemplateEngine $engine, string $template, bool $engineFirst): void
+    {
+        $builder = Application::configure($this->basePath)->addIlluminateDatabase();
+
+        $builder = $engineFirst
+            ? $builder->addTemplateEngine($engine)->addAuthorization(IdentitySource::Cas, TestPermission::class)
+            : $builder->addAuthorization(IdentitySource::Cas, TestPermission::class)->addTemplateEngine($engine);
+
+        $view = $builder->create()->get(View::class);
+
+        self::assertInstanceOf(View::class, $view, 'the view is registered');
+        self::assertSame('guest', $view->render($template), 'cannot() is available and a CLI request is a guest');
     }
 
     public function testAnOidcApplicationMustAddAuthenticationFirst(): void

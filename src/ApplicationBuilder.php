@@ -12,6 +12,7 @@ use Guild\Framework\Authorization\Permission;
 use Guild\Framework\Exception\ConfigurationException;
 use Guild\Framework\ServiceProvider\AuthenticationServiceProvider;
 use Guild\Framework\ServiceProvider\AuthorizationServiceProvider;
+use Guild\Framework\ServiceProvider\AuthorizationTemplateServiceProvider;
 use Guild\Framework\ServiceProvider\RivetServiceProvider;
 use Guild\Framework\ServiceProvider\ViewServiceProvider;
 use Guild\Grouper\Exception\GrouperConfigurationException;
@@ -76,6 +77,9 @@ readonly class ApplicationBuilder
      * Policies are resolved through the container when first used, so their
      * constructor dependencies need autowiring or explicit bindings.
      *
+     * With a template engine configured, before or after this call, templates
+     * get can() and cannot().
+     *
      * @param  class-string<Permission>  $permissions  The application's permission enum.
      * @param  list<class-string>  $policies  Policy classes, each declaring #[HandlesResource].
      */
@@ -107,6 +111,13 @@ readonly class ApplicationBuilder
         }
 
         $this->app->addServiceProvider(new AuthorizationServiceProvider($identitySource, $permissions, $config, $policies));
+        $this->app->setAuthorizationPermissions($permissions);
+
+        $engine = $this->app->getTemplateEngine();
+
+        if ($engine !== null) {
+            $this->app->addServiceProvider(new AuthorizationTemplateServiceProvider($engine, $permissions));
+        }
 
         return $this;
     }
@@ -153,6 +164,12 @@ readonly class ApplicationBuilder
     {
         $this->app->setTemplateEngine($engine);
         $this->app->addServiceProvider(new ViewServiceProvider($engine));
+
+        $permissions = $this->app->getAuthorizationPermissions();
+
+        if ($permissions !== null) {
+            $this->app->addServiceProvider(new AuthorizationTemplateServiceProvider($engine, $permissions));
+        }
 
         return $this;
     }
