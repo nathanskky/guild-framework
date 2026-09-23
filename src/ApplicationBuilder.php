@@ -73,9 +73,13 @@ readonly class ApplicationBuilder
      * come after addAuthentication(). A CAS application never calls
      * addAuthentication(), because Apache authenticates before PHP runs.
      *
+     * Policies are resolved through the container when first used, so their
+     * constructor dependencies need autowiring or explicit bindings.
+     *
      * @param  class-string<Permission>  $permissions  The application's permission enum.
+     * @param  list<class-string>  $policies  Policy classes, each declaring #[HandlesResource].
      */
-    public function addAuthorization(IdentitySource $identitySource, string $permissions): self
+    public function addAuthorization(IdentitySource $identitySource, string $permissions, array $policies = []): self
     {
         if ($identitySource === IdentitySource::Oidc && ! $this->app->isAuthenticationAdded()) {
             throw new ConfigurationException(
@@ -102,7 +106,7 @@ readonly class ApplicationBuilder
             );
         }
 
-        $this->app->addServiceProvider(new AuthorizationServiceProvider($identitySource, $permissions, $config));
+        $this->app->addServiceProvider(new AuthorizationServiceProvider($identitySource, $permissions, $config, $policies));
 
         return $this;
     }

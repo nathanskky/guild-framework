@@ -10,5 +10,6 @@ enum TestPermission: string implements Permission
 {
     case DocumentsCreate = 'documents.create';
     case DocumentsUpdate = 'documents.update';
+    case DocumentsView = 'documents.view';
     case InvoicesApprove = 'invoices.approve';
 }

@@ -7,6 +7,7 @@ namespace Guild\Framework\Test;
 use Guild\Framework\Application;
 use Guild\Framework\ApplicationBuilder;
 use Guild\Framework\Authorization\AuthorizationConfiguration;
+use Guild\Framework\Authorization\Gate;
 use Guild\Framework\Authorization\GrantRepository;
 use Guild\Framework\Authorization\Identity\IdentityReader;
 use Guild\Framework\Authorization\Identity\OidcIdentityReader;
@@ -14,10 +15,12 @@ use Guild\Framework\Authorization\Identity\RemoteUserIdentityReader;
 use Guild\Framework\Authorization\IdentitySource;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
+use Guild\Framework\Authorization\Policy\PolicyRegistry;
 use Guild\Framework\Authorization\UserResolver;
 use Guild\Framework\Exception\ConfigurationException;
 use Guild\Framework\ServiceProvider\AuthenticationServiceProvider;
 use Guild\Framework\ServiceProvider\AuthorizationServiceProvider;
+use Guild\Framework\Test\Authorization\Support\Policy\DocumentPolicy;
 use Guild\Framework\Test\Authorization\Support\TestPermission;
 use Monolog\Logger;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -37,6 +40,8 @@ use Psr\Log\NullLogger;
 #[UsesClass(MembershipProvider::class)]
 #[UsesClass(MembershipCache::class)]
 #[UsesClass(GrantRepository::class)]
+#[UsesClass(Gate::class)]
+#[UsesClass(PolicyRegistry::class)]
 final class ApplicationBuilderAuthorizationTest extends TestCase
 {
     private string $basePath;
@@ -78,6 +83,18 @@ final class ApplicationBuilderAuthorizationTest extends TestCase
             ->create();
 
         self::assertInstanceOf(UserResolver::class, $app->get(UserResolver::class), 'the resolver is registered');
+    }
+
+    public function testTheGateIsRegisteredWithTheListedPolicies(): void
+    {
+        $app = Application::configure($this->basePath)
+            ->enableAutoWiring()
+            ->addIlluminateDatabase()
+            ->addAuthorization(IdentitySource::Cas, TestPermission::class, policies: [DocumentPolicy::class])
+            ->create();
+
+        self::assertInstanceOf(Gate::class, $app->get(Gate::class), 'the gate is registered');
+        self::assertSame($app->get(Gate::class), $app->get(Gate::class), 'and shared');
     }
 
     public function testAnOidcApplicationMustAddAuthenticationFirst(): void

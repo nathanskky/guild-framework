@@ -136,7 +136,7 @@ Application::configure($basePath)
   reading a config file — there is no `config/view.php`.** Both engines load templates from
   `{basePath}/templates` by convention. `View::render()` dispatches to `Environment::render()` or
   `Engine::renderToString()` depending on which engine is bound.
-- `addAuthorization(IdentitySource $identitySource, string $permissions)` requires
+- `addAuthorization(IdentitySource $identitySource, string $permissions, array $policies = [])` requires
   `{basePath}/config/authorization.php`, which must return an `AuthorizationConfiguration` (Grouper
   connection settings, the System Admin group's ACM label, the membership TTL and stale cap, Grouper
   timeouts). It is the first `add*()` method that takes arguments **and** reads a config file, and the split
@@ -145,17 +145,21 @@ Application::configure($basePath)
   varies by deployment**, including the Grouper secret. With `IdentitySource::Oidc` it **must be called
   after `addAuthentication()`** and throws `ConfigurationException` otherwise; a CAS application never calls
   `addAuthentication()`, because Apache authenticates before PHP runs. It registers
-  `AuthorizationServiceProvider`, which lazily binds `UserResolver` and what it needs. The grant lookup
+  `AuthorizationServiceProvider`, which lazily binds `UserResolver`, `Gate` and what they need.
+  `$policies` is a flat list of policy classes, each declaring `#[HandlesResource]`; they are read and
+  validated on first use, never at boot, and resolved through the container. The grant lookup
   resolves the shared `Capsule`, so `addIlluminateDatabase()` must also have been called.
 - `withLogger(LoggerInterface $logger)` replaces the default logger (see below).
 - **Config failures are wrapped** in `Guild\Framework\Exception\ConfigurationException` (a `LogicException`)
   by `addAuthentication()`, `addIlluminateDatabase()` and `addAuthorization()`, rather than letting the
   underlying parse/type error — or, for authorization, a `GrouperConfigurationException` from constructing
   `GrouperConfiguration` — propagate raw. `ConfigurationException` covers configuration only.
-  `Guild\Framework\Exception\AuthorizationUnavailableException` (a `RuntimeException`) is the runtime
-  condition "group membership could not be determined": Grouper is unreachable and no cached membership is
-  recent enough. It is deliberately not a denial type, so an application can render it as a 503 rather than
-  a 403.
+  Three runtime types sit alongside it, all `RuntimeException`s:
+  `Exception\AuthorizationException` is a denial from `Gate::authorize()` (render as 403);
+  `Exception\AuthenticationRequiredException` extends it for a denied guest, so an OIDC app can redirect
+  to login instead; `Exception\AuthorizationUnavailableException` means group membership could not be
+  determined — Grouper is unreachable and no cached membership is recent enough. The last is deliberately
+  not a denial type, so an application can render it as a 503 rather than a 403.
   **`addRouting()` does not do this** — it is not wrapped in a try/catch, so a missing or broken
   `routes/routes.php` surfaces as a raw `require` failure. And if the file loads but returns something that
   is not callable, the `is_callable()` guard means **no routes are registered and no error is raised** —
@@ -265,10 +269,16 @@ that file:
 - **`Application::getPath()` throws on unknown resources.** It calls `$this->get('path.' . $resource)` with
   no existence check, so an unrecognized resource raises a container `NotFoundException` rather than
   returning `null` as its `?string` signature suggests. Only `path.base` and `path.config` are bound.
-- **Authorization covers the current user only.** `UserResolver::current()` returns a `User` (username,
-  OIDC claims, Grouper groups, roles, permissions, System Admin check) or `null` for a guest. There is no
-  Gate, no policy support, no template `can()` and no admin UI yet. Read `AUTHORIZATION-PLANNING.md` at the
-  workspace root before extending it.
+- **Authorization has a user, a Gate and policies, but no template functions or admin UI yet.**
+  `UserResolver::current()` returns a `User` or `null` for a guest. `Gate::allows()/denies()/authorize()`
+  take a case of the application's `Permission` enum and an optional resource. Without a resource the
+  user's roles decide; with one, the roles must grant the permission **and** the resource's policy method
+  (bound by `#[Handles]`) must agree. The System Admin group bypasses everything, except when membership
+  is stale. Read `AUTHORIZATION-PLANNING.md` at the workspace root before extending it.
+- **Policy mistakes throw `ConfigurationException` on first use, for every user** — no policy for the
+  resource's exact class, no `#[Handles]` method for the permission, duplicates, a non-`bool` return, a
+  case from another enum, or a first parameter that is not `User`/`?User`. The policy is resolved before
+  any allow or deny decision, so a mistake cannot hide behind a user who lacks the grant.
 - **Only Grouper membership is cached; grants are read fresh.** Membership lives in the PHP session under
   `guild_framework_membership` for the configured TTL, is served stale up to the stale cap while Grouper is
   unreachable (with a warning logged every time), and after that `AuthorizationUnavailableException` is

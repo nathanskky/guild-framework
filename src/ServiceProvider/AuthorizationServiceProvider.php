@@ -6,6 +6,7 @@ namespace Guild\Framework\ServiceProvider;
 
 use Guild\Access\Authentication\OIDC\OidcAuthenticationService;
 use Guild\Framework\Authorization\AuthorizationConfiguration;
+use Guild\Framework\Authorization\Gate;
 use Guild\Framework\Authorization\GrantRepository;
 use Guild\Framework\Authorization\Identity\IdentityReader;
 use Guild\Framework\Authorization\Identity\OidcIdentityReader;
@@ -15,6 +16,7 @@ use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
 use Guild\Framework\Authorization\Membership\Session;
 use Guild\Framework\Authorization\Permission;
+use Guild\Framework\Authorization\Policy\PolicyRegistry;
 use Guild\Framework\Authorization\UserResolver;
 use Guild\Grouper\GrouperClient;
 use GuzzleHttp\Client;
@@ -27,17 +29,21 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
 {
     /**
      * @param  class-string<Permission>  $permissionEnum
+     * @param  list<class-string>  $policies
      */
     public function __construct(
         private readonly IdentitySource $identitySource,
         private readonly string $permissionEnum,
         private readonly AuthorizationConfiguration $config,
+        private readonly array $policies = [],
     ) {
     }
 
     public function provides(string $id): bool
     {
         $services = [
+            Gate::class,
+            PolicyRegistry::class,
             UserResolver::class,
             IdentityReader::class,
             MembershipProvider::class,
@@ -121,6 +127,23 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
             $grants = $container->get(GrantRepository::class);
 
             return new UserResolver($identities, $memberships, $grants, $permissionEnum, $config->systemAdminGroup);
+        });
+
+        $policies = $this->policies;
+
+        $container->addShared(PolicyRegistry::class, static fn (): PolicyRegistry => new PolicyRegistry(
+            $container,
+            $policies,
+            $permissionEnum,
+        ));
+
+        $container->addShared(Gate::class, static function () use ($container, $permissionEnum): Gate {
+            /** @var UserResolver $users */
+            $users = $container->get(UserResolver::class);
+            /** @var PolicyRegistry $policies */
+            $policies = $container->get(PolicyRegistry::class);
+
+            return new Gate($users, $policies, $permissionEnum);
         });
     }
 }
