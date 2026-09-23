@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Carbon;
 
 /**
  * A Grouper group registered with the application.
@@ -20,6 +21,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property bool $active
  * @property string $created_by
  * @property string|null $updated_by
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property-read Collection<int, Role> $roles
  */
 #[Table('framework_groups')]
@@ -42,7 +45,7 @@ class Group extends Model
      */
     public function roles(): BelongsToMany
     {
-        return $this->belongsToMany(Role::class, 'framework_groups_roles');
+        return $this->belongsToMany(Role::class, 'framework_groups_roles')->withTimestamps();
     }
 
     /**

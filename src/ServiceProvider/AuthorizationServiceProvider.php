@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Guild\Framework\ServiceProvider;
 
 use Guild\Access\Authentication\OIDC\OidcAuthenticationService;
+use Guild\Framework\Admin\Actor;
 use Guild\Framework\Admin\AdminPage;
 use Guild\Framework\Admin\Csrf;
 use Guild\Framework\Admin\Flash;
@@ -262,7 +263,26 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
             return new VerifyCsrfToken($csrf, $page());
         });
         $container->addShared(OverviewController::class, static fn (): OverviewController => new OverviewController($page(), $flash(), $catalog()));
-        $container->addShared(GroupController::class, static fn (): GroupController => new GroupController($page(), $flash()));
-        $container->addShared(RoleController::class, static fn (): RoleController => new RoleController($page(), $flash(), $catalog()));
+        $csrf = static function () use ($container): Csrf {
+            /** @var Csrf $csrf */
+            $csrf = $container->get(Csrf::class);
+
+            return $csrf;
+        };
+        $actor = static function () use ($container): Actor {
+            /** @var UserResolver $users */
+            $users = $container->get(UserResolver::class);
+
+            return new Actor($users);
+        };
+
+        $container->addShared(GroupController::class, static function () use ($container, $page, $flash, $csrf, $actor): GroupController {
+            /** @var GrouperClient $grouper */
+            $grouper = $container->get(GrouperClient::class);
+
+            return new GroupController($page(), $flash(), $csrf(), $actor(), $grouper);
+        });
+        $container->addShared(RoleController::class, static fn (): RoleController => new RoleController($page(), $flash(), $csrf(), $actor(), $catalog()));
+
     }
 }

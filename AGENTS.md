@@ -43,7 +43,7 @@ is **no new failures** against that baseline — not a green run.
 ```bash
 composer install       # install dependencies
 composer test          # phpunit
-composer analyse       # phpstan, level 10, scoped to src/
+composer analyse       # phpstan, level 10, scoped to src/, with --memory-limit=512M
 composer format:check  # pint, PSR-12 style check (writes nothing)
 composer check         # test, then analyse, then style check; stops at the first failure
 ```
@@ -58,6 +58,10 @@ committed code, so you will see them on a fresh clone:
   which is not declared on `DefinitionContainerInterface` (see [Landmines](#landmines)), plus five
   cascading errors where the resulting `mixed` flows into string concatenation and the Twig/Latte loader
   constructors.
+
+`composer analyse` passes `--memory-limit=512M`: at PHP's default 128M a parallel worker runs out of memory
+on the Eloquent-heavy admin controllers and the result is incomplete. Pass the same flag when running
+`vendor/bin/phpstan` directly.
 
 If your count is higher than 7, the extra errors are from uncommitted work in your tree — which is why
 taking your own baseline before you start is still worth the ten seconds.
@@ -275,8 +279,12 @@ that file:
 - **`Application::getPath()` throws on unknown resources.** It calls `$this->get('path.' . $resource)` with
   no existence check, so an unrecognized resource raises a container `NotFoundException` rather than
   returning `null` as its `?string` signature suggests. Only `path.base` and `path.config` are bound.
-- **Authorization has a user, a Gate, policies, template functions and read-only administration pages.**
-  Registering groups and editing roles and grants are not built yet.
+- **Authorization is complete through its administration UI.** `/framework/authorization` registers
+  Grouper groups from their ACM label (`findByLabel()`; one match registers, several are offered by
+  identifier, none and "Grouper unreachable" are reported differently), maps them to roles on the group's
+  page, and creates, edits and deletes roles and their grants. Deletes ask for confirmation and detach
+  mappings and grants explicitly rather than relying on the foreign-key cascades. Every write sets
+  `created_by`/`updated_by` to the administrator's username, pivot rows included.
   `UserResolver::current()` returns a `User` or `null` for a guest. `Gate::allows()/denies()/authorize()`
   take a case of the application's `Permission` enum and an optional resource. Without a resource the
   user's roles decide; with one, the roles must grant the permission **and** the resource's policy method

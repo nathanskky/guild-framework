@@ -77,6 +77,33 @@ final class FakeGrouper
         return new Response(200, [], json_encode(['WsGetGroupsLiteResult' => $result], JSON_THROW_ON_ERROR));
     }
 
+    /**
+     * A successful findGroups response, as a label search returns.
+     *
+     * @param  array<string, string>  $groups  identifier => displayExtension
+     */
+    public static function labelMatches(array $groups): ResponseInterface
+    {
+        $results = [];
+
+        foreach ($groups as $identifier => $label) {
+            $results[] = [
+                'name' => $identifier,
+                'displayName' => 'Indiana University:Roles:' . $label,
+                'displayExtension' => $label,
+                'uuid' => md5($identifier),
+            ];
+        }
+
+        $result = ['resultMetadata' => ['resultCode' => 'SUCCESS', 'success' => 'T']];
+
+        if ($results !== []) {
+            $result['groupResults'] = $results;
+        }
+
+        return new Response(200, [], json_encode(['WsFindGroupsResults' => $result], JSON_THROW_ON_ERROR));
+    }
+
     public static function unavailable(): ResponseInterface
     {
         return new Response(503, [], 'Service Unavailable');
