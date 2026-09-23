@@ -8,7 +8,7 @@ use LogicException;
 
 /**
  * Thrown when the framework encounters an issue while working with
- * a configuration file, such as /config/app.php or /config/authentication.php.
+ * a configuration file, such as /config/authentication.php or /config/authorization.php.
  */
 class ConfigurationException extends LogicException
 {
