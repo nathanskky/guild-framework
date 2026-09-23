@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Guild\Framework;
 
 use Error;
+use Guild\Access\Authentication\OIDC\OidcAuthenticationMiddleware;
 use Guild\Access\Authentication\OIDC\OidcConfiguration;
 use Guild\Framework\Authorization\AdminMenu;
 use Guild\Framework\Authorization\AuthorizationConfiguration;
 use Guild\Framework\Authorization\IdentitySource;
 use Guild\Framework\Authorization\Permission;
 use Guild\Framework\Exception\ConfigurationException;
+use Guild\Framework\Middleware\RequireSystemAdmin;
+use Guild\Framework\Middleware\VerifyCsrfToken;
 use Guild\Framework\ServiceProvider\AuthenticationServiceProvider;
 use Guild\Framework\ServiceProvider\AuthorizationServiceProvider;
 use Guild\Framework\ServiceProvider\AuthorizationTemplateServiceProvider;
@@ -125,6 +128,7 @@ readonly class ApplicationBuilder
             $adminMenu,
         ));
         $this->app->setAuthorizationPermissions($permissions);
+        $this->registerAuthorizationRoutes($identitySource);
 
         $engine = $this->app->getTemplateEngine();
 
@@ -133,6 +137,34 @@ readonly class ApplicationBuilder
         }
 
         return $this;
+    }
+
+    /**
+     * Mount the framework's administration pages under /framework/authorization
+     * on the shared Router. Independent of addRouting(), which loads the
+     * application's own routes; /framework is reserved, so the two never
+     * collide, though an application catch-all registered first could shadow it.
+     */
+    private function registerAuthorizationRoutes(IdentitySource $identitySource): void
+    {
+        $router = $this->app->get(Router::class);
+
+        if (! $router instanceof Router) {
+            throw new ConfigurationException('The container did not return a Router.');
+        }
+
+        /** @var callable(\League\Route\RouteGroup): void $routes */
+        $routes = require dirname(__DIR__) . '/routes/authorization.php';
+        $group = $router->group('/framework/authorization', $routes);
+
+        // A guest on the OIDC path is sent to log in; under CAS, Apache must
+        // protect these paths, and RequireSystemAdmin explains that to a guest.
+        if ($identitySource === IdentitySource::Oidc) {
+            $group->lazyMiddleware(OidcAuthenticationMiddleware::class);
+        }
+
+        $group->lazyMiddleware(RequireSystemAdmin::class);
+        $group->lazyMiddleware(VerifyCsrfToken::class);
     }
 
     /**
@@ -209,6 +241,7 @@ readonly class ApplicationBuilder
         }
 
         $this->app->addServiceProvider(new RivetServiceProvider($engine, $pageDefaults));
+        $this->app->markRivetAdded();
 
         return $this;
     }

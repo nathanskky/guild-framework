@@ -250,10 +250,12 @@ that file:
 
 ## Landmines
 
-- **`db/seeds/` and `routes/` are empty but reserved — do not delete them.** `routes/` is where
-  *framework-owned* routes will eventually live (framework administration / settings interfaces, not yet
-  written). `db/seeds/` is already referenced by `phinx.php`. Note that `routes/` is **not** the file
-  `addRouting()` loads: that is the *consuming app's* `routes/routes.php`, resolved from its `$basePath`.
+- **`routes/` holds the framework's own routes; `db/seeds/` is empty but reserved.** Do not delete either.
+  `routes/authorization.php` is mounted under `/framework/authorization` by `addAuthorization()`, on the
+  shared `Router`, independently of `addRouting()`. `db/seeds/` is referenced by `phinx.php`. Note that
+  `routes/` is **not** the file `addRouting()` loads: that is the *consuming app's* `routes/routes.php`,
+  resolved from its `$basePath`. An application catch-all route registered before `addAuthorization()`
+  can shadow `/framework`.
 - **Migrations cannot be run from this repo.** `phinx.php` does `require dirname(__FILE__, 4) . '/bootstrap/app.php'`,
   which only resolves when this package sits at `<app>/vendor/guild/framework/phinx.php`. Run it from the
   consuming app instead:
@@ -273,7 +275,8 @@ that file:
 - **`Application::getPath()` throws on unknown resources.** It calls `$this->get('path.' . $resource)` with
   no existence check, so an unrecognized resource raises a container `NotFoundException` rather than
   returning `null` as its `?string` signature suggests. Only `path.base` and `path.config` are bound.
-- **Authorization has a user, a Gate, policies and template functions, but no admin UI yet.**
+- **Authorization has a user, a Gate, policies, template functions and read-only administration pages.**
+  Registering groups and editing roles and grants are not built yet.
   `UserResolver::current()` returns a `User` or `null` for a guest. `Gate::allows()/denies()/authorize()`
   take a case of the application's `Permission` enum and an optional resource. Without a resource the
   user's roles decide; with one, the roles must grant the permission **and** the resource's policy method
@@ -294,6 +297,16 @@ that file:
   lets `addRivet()` and `addAuthorization()` be called in either order. `AdminNavigation` never throws for
   an unanswerable System Admin check; it leaves the menu out. The menu is cosmetic: the `/framework`
   routes must gate themselves.
+- **The administration pages are PHP-built Rivet documents gated on the System Admin group.** Every
+  `/framework/authorization` route runs `RequireSystemAdmin` (guest or non-member → 403, membership that
+  cannot be confirmed → 503; under OIDC, `OidcAuthenticationMiddleware` first, so a guest logs in) and then
+  `VerifyCsrfToken` (any non-GET must carry the session's `_csrf` field). `Admin\AdminPage` renders through
+  the application's Rivet `Renderer` when `addRivet()` was called, else through a fallback whose navigation
+  is the admin menu alone. Controllers and middleware are bound explicitly, so no autowiring is needed.
+- **Eloquent query-builder calls lose model types under PHPStan.** Without Larastan, `->orderBy()` and
+  other calls forwarded to the query builder make `->get()` return `Collection<int, stdClass>`. Load the
+  models, then sort the collection (`->get()->sortBy('name')`); the models' `@property` tags then type
+  every column.
 - **`View::render()` unwraps `AuthorizationUnavailableException`.** Twig wraps anything thrown inside a
   template function in `Twig\Error\RuntimeError`; Latte does not. `View` rethrows the unavailable exception
   as itself under both engines so an application's 503 handling sees it. Everything else stays wrapped,

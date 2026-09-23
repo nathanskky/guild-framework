@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace Guild\Framework\ServiceProvider;
 
 use Guild\Access\Authentication\OIDC\OidcAuthenticationService;
+use Guild\Framework\Admin\AdminPage;
+use Guild\Framework\Admin\Csrf;
+use Guild\Framework\Admin\Flash;
+use Guild\Framework\Admin\PermissionCatalog;
+use Guild\Framework\Application;
 use Guild\Framework\Authorization\AdminMenu;
 use Guild\Framework\Authorization\AdminNavigation;
 use Guild\Framework\Authorization\AuthorizationConfiguration;
@@ -20,10 +25,21 @@ use Guild\Framework\Authorization\Membership\Session;
 use Guild\Framework\Authorization\Permission;
 use Guild\Framework\Authorization\Policy\PolicyRegistry;
 use Guild\Framework\Authorization\UserResolver;
+use Guild\Framework\Controller\Authorization\GroupController;
+use Guild\Framework\Controller\Authorization\OverviewController;
+use Guild\Framework\Controller\Authorization\RoleController;
+use Guild\Framework\Exception\ConfigurationException;
+use Guild\Framework\Middleware\RequireSystemAdmin;
+use Guild\Framework\Middleware\VerifyCsrfToken;
+use Guild\Framework\Rivet\ContainerNavigation;
 use Guild\Grouper\GrouperClient;
 use Guild\Rivet\Page\NavigationProvider;
+use Guild\Rivet\Page\PageDefaults;
+use Guild\Rivet\Render\Renderer;
+use Guild\Rivet\Rivet;
 use GuzzleHttp\Client;
 use Illuminate\Database\Capsule\Manager as Capsule;
+use League\Container\DefinitionContainerInterface;
 use League\Container\ServiceProvider\AbstractServiceProvider;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
@@ -46,6 +62,15 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
     public function provides(string $id): bool
     {
         $services = [
+            AdminPage::class,
+            Csrf::class,
+            Flash::class,
+            PermissionCatalog::class,
+            RequireSystemAdmin::class,
+            VerifyCsrfToken::class,
+            OverviewController::class,
+            GroupController::class,
+            RoleController::class,
             Gate::class,
             PolicyRegistry::class,
             UserResolver::class,
@@ -154,6 +179,8 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
             return new Gate($users, $policies, $permissionEnum);
         });
 
+        $this->registerAdministration($container, $permissionEnum);
+
         $adminMenu = $this->adminMenu;
 
         if ($adminMenu !== null) {
@@ -166,5 +193,76 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
                 return new AdminNavigation($users, $adminMenu, $request);
             });
         }
+    }
+
+    /**
+     * The /framework/authorization pages: their layout, form protection, gate
+     * and controllers. Bound explicitly, so the pages work without autowiring.
+     *
+     * @param  class-string<Permission>  $permissionEnum
+     */
+    private function registerAdministration(DefinitionContainerInterface $container, string $permissionEnum): void
+    {
+        $identitySource = $this->identitySource;
+
+        $container->addShared(AdminPage::class, static fn (): AdminPage => new AdminPage(
+            static function () use ($container): Renderer {
+                if ($container instanceof Application && $container->isRivetAdded()) {
+                    $renderer = $container->get(Renderer::class);
+
+                    if (! $renderer instanceof Renderer) {
+                        throw new ConfigurationException('The container did not return a Rivet Renderer.');
+                    }
+
+                    return $renderer;
+                }
+
+                // No application navigation to add to (Q28): the header holds the
+                // administration menu alone.
+                return new Renderer(
+                    Rivet::registry(),
+                    pageDefaults: new PageDefaults(appTitle: 'Administration', homeHref: '/framework/authorization'),
+                    navigation: new ContainerNavigation($container),
+                );
+            },
+        ));
+        $container->addShared(Csrf::class, static fn (): Csrf => new Csrf(new Session()));
+        $container->addShared(Flash::class, static fn (): Flash => new Flash(new Session()));
+        $container->addShared(PermissionCatalog::class, static fn (): PermissionCatalog => new PermissionCatalog($permissionEnum));
+
+        $page = static function () use ($container): AdminPage {
+            /** @var AdminPage $page */
+            $page = $container->get(AdminPage::class);
+
+            return $page;
+        };
+        $flash = static function () use ($container): Flash {
+            /** @var Flash $flash */
+            $flash = $container->get(Flash::class);
+
+            return $flash;
+        };
+        $catalog = static function () use ($container): PermissionCatalog {
+            /** @var PermissionCatalog $catalog */
+            $catalog = $container->get(PermissionCatalog::class);
+
+            return $catalog;
+        };
+
+        $container->addShared(RequireSystemAdmin::class, static function () use ($container, $page, $identitySource): RequireSystemAdmin {
+            /** @var UserResolver $users */
+            $users = $container->get(UserResolver::class);
+
+            return new RequireSystemAdmin($users, $page(), $identitySource);
+        });
+        $container->addShared(VerifyCsrfToken::class, static function () use ($container, $page): VerifyCsrfToken {
+            /** @var Csrf $csrf */
+            $csrf = $container->get(Csrf::class);
+
+            return new VerifyCsrfToken($csrf, $page());
+        });
+        $container->addShared(OverviewController::class, static fn (): OverviewController => new OverviewController($page(), $flash(), $catalog()));
+        $container->addShared(GroupController::class, static fn (): GroupController => new GroupController($page(), $flash()));
+        $container->addShared(RoleController::class, static fn (): RoleController => new RoleController($page(), $flash(), $catalog()));
     }
 }

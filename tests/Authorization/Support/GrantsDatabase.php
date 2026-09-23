@@ -16,13 +16,19 @@ final class GrantsDatabase
 {
     public readonly Connection $connection;
 
-    public function __construct()
+    /**
+     * @param  Connection|null  $connection  an existing connection to create the tables on, such as an
+     *                                       application's; a fresh in-memory one by default
+     */
+    public function __construct(?Connection $connection = null)
     {
-        $capsule = new Capsule();
-        $capsule->addConnection(['driver' => 'sqlite', 'database' => ':memory:']);
+        if ($connection === null) {
+            $capsule = new Capsule();
+            $capsule->addConnection(['driver' => 'sqlite', 'database' => ':memory:']);
+            $connection = $capsule->getConnection();
+            assert($connection instanceof Connection);
+        }
 
-        $connection = $capsule->getConnection();
-        assert($connection instanceof Connection);
         $this->connection = $connection;
 
         $schema = $this->connection->getSchemaBuilder();
@@ -32,17 +38,20 @@ final class GrantsDatabase
             $table->string('name')->unique();
             $table->string('group_identifier')->unique();
             $table->boolean('active')->default(false);
+            self::audit($table);
         });
         $schema->create('framework_roles', static function (Blueprint $table): void {
             $table->increments('id');
             $table->string('name')->unique();
             $table->boolean('active')->default(false);
+            self::audit($table);
         });
         $schema->create('framework_groups_roles', static function (Blueprint $table): void {
             $table->increments('id');
             $table->unsignedInteger('group_id');
             $table->unsignedInteger('role_id');
             $table->unique(['group_id', 'role_id']);
+            self::audit($table);
         });
         $schema->create('framework_role_permissions', static function (Blueprint $table): void {
             $table->increments('id');
@@ -50,7 +59,15 @@ final class GrantsDatabase
             $table->string('name');
             $table->boolean('active')->default(false);
             $table->unique(['role_id', 'name']);
+            self::audit($table);
         });
+    }
+
+    private static function audit(Blueprint $table): void
+    {
+        $table->string('created_by', 8)->default('seed');
+        $table->string('updated_by', 8)->nullable();
+        $table->timestamps();
     }
 
     public function group(string $identifier, bool $active = true): int

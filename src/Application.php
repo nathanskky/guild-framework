@@ -33,6 +33,12 @@ final class Application extends Container
     private bool $authenticationAdded = false;
 
     /**
+     * Whether addRivet() has run, so the administration pages can use the
+     * application's renderer rather than their fallback.
+     */
+    private bool $rivetAdded = false;
+
+    /**
      * The permission enum given to addAuthorization(), or null if it has not
      * been called. Lets addTemplateEngine() add the template functions when it
      * is called second.
@@ -134,6 +140,16 @@ final class Application extends Container
     public function isAuthenticationAdded(): bool
     {
         return $this->authenticationAdded;
+    }
+
+    public function markRivetAdded(): void
+    {
+        $this->rivetAdded = true;
+    }
+
+    public function isRivetAdded(): bool
+    {
+        return $this->rivetAdded;
     }
 
     /**
