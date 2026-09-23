@@ -9,7 +9,11 @@ use Laminas\HttpHandlerRunner\Emitter\SapiEmitter;
 use League\Container\Argument\Literal\StringArgument;
 use League\Container\Container;
 use League\Route\Strategy\ApplicationStrategy;
+use Monolog\Handler\ErrorLogHandler;
+use Monolog\Logger;
+use Monolog\Processor\PsrLogMessageProcessor;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Log\LoggerInterface;
 
 final class Application extends Container
 {
@@ -21,6 +25,12 @@ final class Application extends Container
      * whether an engine is bound would answer yes even when none was chosen.
      */
     private ?TemplateEngine $templateEngine = null;
+
+    /**
+     * Whether addAuthentication() has run. Remembered for the same reason as
+     * $templateEngine: the container cannot be asked.
+     */
+    private bool $authenticationAdded = false;
 
     /**
      * The base path for the application installation.
@@ -90,6 +100,11 @@ final class Application extends Container
             return new Router()->setStrategy($strategy);
         });
         $this->addShared(SapiEmitter::class);
+        $this->addShared(LoggerInterface::class, static fn (): LoggerInterface => new Logger(
+            'framework',
+            [new ErrorLogHandler()],
+            [new PsrLogMessageProcessor()],
+        ));
     }
 
     public function setTemplateEngine(TemplateEngine $engine): void
@@ -100,6 +115,16 @@ final class Application extends Container
     public function getTemplateEngine(): ?TemplateEngine
     {
         return $this->templateEngine;
+    }
+
+    public function markAuthenticationAdded(): void
+    {
+        $this->authenticationAdded = true;
+    }
+
+    public function isAuthenticationAdded(): bool
+    {
+        return $this->authenticationAdded;
     }
 
     public function run(): void

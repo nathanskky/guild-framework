@@ -6,15 +6,21 @@ namespace Guild\Framework;
 
 use Error;
 use Guild\Access\Authentication\OIDC\OidcConfiguration;
+use Guild\Framework\Authorization\AuthorizationConfiguration;
+use Guild\Framework\Authorization\IdentitySource;
+use Guild\Framework\Authorization\Permission;
 use Guild\Framework\Exception\ConfigurationException;
+use Guild\Framework\ServiceProvider\AuthenticationServiceProvider;
+use Guild\Framework\ServiceProvider\AuthorizationServiceProvider;
 use Guild\Framework\ServiceProvider\RivetServiceProvider;
 use Guild\Framework\ServiceProvider\ViewServiceProvider;
+use Guild\Grouper\Exception\GrouperConfigurationException;
 use Guild\Rivet\Page\PageDefaults;
 use Illuminate\Container\Container;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Events\Dispatcher;
-use Guild\Framework\ServiceProvider\AuthenticationServiceProvider;
 use League\Container\ReflectionContainer;
+use Psr\Log\LoggerInterface;
 
 readonly class ApplicationBuilder
 {
@@ -53,6 +59,60 @@ readonly class ApplicationBuilder
         }
 
         $this->app->addServiceProvider(new AuthenticationServiceProvider($config));
+        $this->app->markAuthenticationAdded();
+
+        return $this;
+    }
+
+    /**
+     * Resolve the authenticated user's Grouper groups to roles and permissions,
+     * and make the current user available through UserResolver.
+     *
+     * Arguments carry code-level facts; config/authorization.php carries the
+     * settings that vary by deployment. With IdentitySource::Oidc this must
+     * come after addAuthentication(). A CAS application never calls
+     * addAuthentication(), because Apache authenticates before PHP runs.
+     *
+     * @param  class-string<Permission>  $permissions  The application's permission enum.
+     */
+    public function addAuthorization(IdentitySource $identitySource, string $permissions): self
+    {
+        if ($identitySource === IdentitySource::Oidc && ! $this->app->isAuthenticationAdded()) {
+            throw new ConfigurationException(
+                'addAuthorization() was given IdentitySource::Oidc, but addAuthentication() has not been called. '
+                . 'Call addAuthentication() first, or use IdentitySource::Cas if Apache authenticates requests.'
+            );
+        }
+
+        $configFilePath = $this->app->getPath('config') . '/authorization.php';
+
+        try {
+            $config = require $configFilePath;
+        } catch (Error | GrouperConfigurationException $error) {
+            throw new ConfigurationException(
+                'Problem encountered while attempting to read authorization config file: '
+                . $error->getMessage(),
+                previous: $error,
+            );
+        }
+
+        if (! $config instanceof AuthorizationConfiguration) {
+            throw new ConfigurationException(
+                'Authorization configuration file must return an instance of AuthorizationConfiguration.'
+            );
+        }
+
+        $this->app->addServiceProvider(new AuthorizationServiceProvider($identitySource, $permissions, $config));
+
+        return $this;
+    }
+
+    /**
+     * Replace the default logger, which writes through PHP's error_log().
+     */
+    public function withLogger(LoggerInterface $logger): self
+    {
+        $this->app->addShared(LoggerInterface::class, $logger, overwrite: true);
 
         return $this;
     }

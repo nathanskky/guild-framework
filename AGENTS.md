@@ -26,7 +26,7 @@ root-level tooling or a shared root autoloader.
 |---|---|---|
 | `guild/framework` *(this one)* | `Guild\Framework\` | Application kernel / DI container |
 | `guild/access` | `Guild\Access\` | IU Login (OIDC) authentication library. **This package depends on it** (`^1.0`, via VCS repo) |
-| `guild/grouper` | `Guild\Grouper\` | Read-only IU Grouper group-membership lookup. **This package depends on it** (`^0.1`, via VCS repo). Pre-1.0 — treat minor releases as potentially breaking |
+| `guild/grouper` | `Guild\Grouper\` | Read-only IU Grouper group-membership lookup. **This package depends on it** (`^0.1.1`, via VCS repo). Pre-1.0 — treat minor releases as potentially breaking |
 | `guild/starter` | `Guild\Starter\` | Runnable example app; the primary consumer of this package |
 | `iu/notifications` | `IU\Notifications\` | IU Notifications API client. Fully independent — different GitHub host, and its `<8.5` PHP constraint is mutually exclusive with this package's `~8.5.0` |
 | `guild/rivet` | `Guild\Rivet\` | IU Rivet Design System components. Will be exposed via `ApplicationBuilder::addRivet()` |
@@ -48,32 +48,33 @@ composer format:check  # pint, PSR-12 style check (writes nothing)
 composer check         # test, then analyse, then style check; stops at the first failure
 ```
 
-**`composer test` fails right now, by design.** `tests/` is empty, and `phpunit.xml` sets
-`failOnEmptyTestSuite="true"` so an empty run reports `No tests executed!` and exits non-zero rather than
-falsely exiting 0. **The fix is to write a test, not to remove the flag.** Treat it as a known-red baseline
-until the suite exists.
+**`composer test` is green.** `phpunit.xml` sets `failOnEmptyTestSuite="true"`, so an empty run would
+report `No tests executed!` and exit non-zero rather than falsely exiting 0 — keep the flag.
 
-**`composer analyse` is also red: 15 pre-existing errors on a clean checkout of `develop`.** All of them
-are in committed code, so you will see them on a fresh clone:
+**`composer analyse` is red: 8 pre-existing errors on a clean checkout of `develop`.** All of them are in
+committed code, so you will see them on a fresh clone:
 
-- **7 × `missingType.generics`** across `Model/{Group,Role,RolePermission}.php` — level 10 wants generic
-  type parameters on the Eloquent relation return types (`BelongsToMany`, `HasMany`, `BelongsTo`) and on
-  the `Builder` parameter of each `#[Scope]` method.
 - **7 in `ServiceProvider/ViewServiceProvider.php`** — two `method.notFound` on `$container->getPath()`,
   which is not declared on `DefinitionContainerInterface` (see [Landmines](#landmines)), plus five
   cascading errors where the resulting `mixed` flows into string concatenation and the Twig/Latte loader
   constructors.
 - **1 × `missingType.iterableValue`** on `View::render()`'s `$data` parameter.
 
-If your count is higher than 15, the extra errors are from uncommitted work in your tree — which is why
+If your count is higher than 8, the extra errors are from uncommitted work in your tree — which is why
 taking your own baseline before you start is still worth the ten seconds.
 
-**Writing the first test is stricter than you expect.** `phpunit.xml` is the strictest config in the
-workspace: `requireCoverageMetadata`, `beStrictAboutCoverageMetadata`, `beStrictAboutOutputDuringTests`,
+**Tests are stricter than you expect.** `phpunit.xml` is the strictest config in the workspace:
+`requireCoverageMetadata`, `beStrictAboutCoverageMetadata`, `beStrictAboutOutputDuringTests`,
 `failOnPhpunitDeprecation`, `failOnRisky`, `failOnWarning`. A new test **without**
-`#[CoversClass]`/`#[CoversMethod]` fails the whole run, and there are no existing tests here to copy from.
-Test classes belong under `Guild\Framework\Test\` (autoload-dev maps this to `tests/`). For a worked
-example of the house test style, read `access/tests/` in the sibling repo.
+`#[CoversClass]`/`#[CoversMethod]` fails the whole run; list collaborators with `#[UsesClass]`. Test classes
+belong under `Guild\Framework\Test\` (autoload-dev maps this to `tests/`); `tests/Authorization/` is the
+local reference, following the house style of `access/tests/`:
+
+- No PHPUnit mocks. Grouper is a real `GrouperClient` over Guzzle's `MockHandler`
+  (`tests/Authorization/Support/FakeGrouper.php`); the authorization tables are in-memory SQLite
+  (`Support/GrantsDatabase.php`).
+- Anything touching the PHP session runs with `#[RunTestsInSeparateProcesses]` and
+  `#[PreserveGlobalState(false)]`, and uses a real `session_start()`.
 
 ## Architecture
 
@@ -87,6 +88,7 @@ The framework wires several third-party libraries into one application container
 - **`robmorgan/phinx`** — migrations
 - **`guild/access`** — OIDC authentication primitives
 - **`guild/grouper`** — read-only Grouper group-membership lookup, for the authorization layer
+- **`monolog/monolog`** — the default `Psr\Log\LoggerInterface` binding
 - **`guild/rivet`** — IU Rivet Design System components for both engines
 
 ### Bootstrap flow
@@ -134,9 +136,26 @@ Application::configure($basePath)
   reading a config file — there is no `config/view.php`.** Both engines load templates from
   `{basePath}/templates` by convention. `View::render()` dispatches to `Environment::render()` or
   `Engine::renderToString()` depending on which engine is bound.
-- **`addAuthentication()` and `addIlluminateDatabase()` wrap config failures** in
-  `Guild\Framework\Exception\ConfigurationException` (a `LogicException`) rather than letting the underlying
-  parse/type error propagate raw. This is the framework's only exception type.
+- `addAuthorization(IdentitySource $identitySource, string $permissions)` requires
+  `{basePath}/config/authorization.php`, which must return an `AuthorizationConfiguration` (Grouper
+  connection settings, the System Admin group's ACM label, the membership TTL and stale cap, Grouper
+  timeouts). It is the first `add*()` method that takes arguments **and** reads a config file, and the split
+  is deliberate: **arguments carry code-level facts** — the identity source and the application's
+  `Permission` enum class, which PHPStan and an IDE can check — **the config file carries everything that
+  varies by deployment**, including the Grouper secret. With `IdentitySource::Oidc` it **must be called
+  after `addAuthentication()`** and throws `ConfigurationException` otherwise; a CAS application never calls
+  `addAuthentication()`, because Apache authenticates before PHP runs. It registers
+  `AuthorizationServiceProvider`, which lazily binds `UserResolver` and what it needs. The grant lookup
+  resolves the shared `Capsule`, so `addIlluminateDatabase()` must also have been called.
+- `withLogger(LoggerInterface $logger)` replaces the default logger (see below).
+- **Config failures are wrapped** in `Guild\Framework\Exception\ConfigurationException` (a `LogicException`)
+  by `addAuthentication()`, `addIlluminateDatabase()` and `addAuthorization()`, rather than letting the
+  underlying parse/type error — or, for authorization, a `GrouperConfigurationException` from constructing
+  `GrouperConfiguration` — propagate raw. `ConfigurationException` covers configuration only.
+  `Guild\Framework\Exception\AuthorizationUnavailableException` (a `RuntimeException`) is the runtime
+  condition "group membership could not be determined": Grouper is unreachable and no cached membership is
+  recent enough. It is deliberately not a denial type, so an application can render it as a 503 rather than
+  a 403.
   **`addRouting()` does not do this** — it is not wrapped in a try/catch, so a missing or broken
   `routes/routes.php` surfaces as a raw `require` failure. And if the file loads but returns something that
   is not callable, the `is_callable()` guard means **no routes are registered and no error is raised** —
@@ -215,6 +234,7 @@ that file:
 | `addIlluminateDatabase()` | `config/database.php` |
 | `addTemplateEngine()` | none — takes the enum directly; renders from `templates/` |
 | `addRivet()` | none — but requires `addTemplateEngine()` to have been called first |
+| `addAuthorization()` | `config/authorization.php` — plus arguments for the code-level facts; with OIDC, requires `addAuthentication()` first |
 | `enableAutoWiring()` | none |
 
 `guild/starter` is the worked example: it does not call `addAuthentication()`, so its
@@ -245,19 +265,26 @@ that file:
 - **`Application::getPath()` throws on unknown resources.** It calls `$this->get('path.' . $resource)` with
   no existence check, so an unrecognized resource raises a container `NotFoundException` rather than
   returning `null` as its `?string` signature suggests. Only `path.base` and `path.config` are bound.
-- **The RBAC models and migrations are plumbing with nothing on top.** `src/Model/{Group,Role,RolePermission}.php`
-  and the four migrations are real and functional, but no service consumes them. Don't assume
-  authorization works.
-- **`guild/grouper` is installed but not yet consumed.** The dependency resolves and autoloads, and
-  `Guild\Grouper\GrouperClient` is ready to use — but nothing in `src/` calls it, there is no
-  `GrouperServiceProvider`, and `ApplicationBuilder::addAuthorization()` is a stub whose body is TODOs
-  referencing an `AuthorizationServiceProvider` that does not exist. Adding the dependency was deliberately
-  separate from building the layer that uses it.
-- **`Guild\Framework\Authorization\GrouperService` is an empty class**, not a wrapper around
-  `guild/grouper`. Read `grouper/README.md` before filling it in — in particular, `groupsFor()` returns a
-  `GroupMembership|GrouperUnavailable` union that PHPStan will force you to narrow, and an empty membership
-  is a *successful* answer rather than a failure.
-
+- **Authorization covers the current user only.** `UserResolver::current()` returns a `User` (username,
+  OIDC claims, Grouper groups, roles, permissions, System Admin check) or `null` for a guest. There is no
+  Gate, no policy support, no template `can()` and no admin UI yet. Read `AUTHORIZATION-PLANNING.md` at the
+  workspace root before extending it.
+- **Only Grouper membership is cached; grants are read fresh.** Membership lives in the PHP session under
+  `guild_framework_membership` for the configured TTL, is served stale up to the stale cap while Grouper is
+  unreachable (with a warning logged every time), and after that `AuthorizationUnavailableException` is
+  thrown. `User::isSystemAdmin()` never uses stale membership. The role/permission mapping is one query per
+  request, so an administrator's change takes effect on the next request.
+- **The framework starts a PHP session on the CAS path.** Nothing else does there — Apache authenticates
+  before PHP runs — so `Authorization\Membership\Session` starts one, with the same cookie parameters as
+  `guild/access`, the first time membership is needed. Public pages that never check authorization get no
+  session cookie.
+- **The default logger writes through PHP's `error_log()`.** `Application` binds `LoggerInterface` to a
+  Monolog `Logger` on the `framework` channel with an `ErrorLogHandler`, so records land wherever the
+  runtime sends PHP errors. In the `php:*-apache` image that is Apache's `ErrorLog`, which is linked to
+  `/dev/stderr`, which is what a Kubernetes log collector reads. **That is unverified for AppKube's
+  IU-provided image**; if framework warnings do not reach the log platform there, call `withLogger()` with a
+  logger aimed at stderr. Apache prefixes every such line `[php:notice]` regardless of level; the
+  `framework.WARNING:` text is the real level.
 ## Branching and pull requests
 
 **Do not commit directly to `develop`.** Work on a feature branch and open a pull request against
