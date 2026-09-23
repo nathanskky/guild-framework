@@ -135,7 +135,7 @@ Application::configure($basePath)
   reading a config file — there is no `config/view.php`.** Both engines load templates from
   `{basePath}/templates` by convention. `View::render()` dispatches to `Environment::render()` or
   `Engine::renderToString()` depending on which engine is bound.
-- `addAuthorization(IdentitySource $identitySource, string $permissions, array $policies = [])` requires
+- `addAuthorization(IdentitySource $identitySource, string $permissions, array $policies = [], ?AdminMenu $adminMenu = new AdminMenu())` requires
   `{basePath}/config/authorization.php`, which must return an `AuthorizationConfiguration` (Grouper
   connection settings, the System Admin group's ACM label, the membership TTL and stale cap, Grouper
   timeouts). It is the first `add*()` method that takes arguments **and** reads a config file, and the split
@@ -149,7 +149,9 @@ Application::configure($basePath)
   validated on first use, never at boot, and resolved through the container. **Templates get `can()` and
   `cannot()`** whenever a template engine is configured too — `addAuthorization()` and
   `addTemplateEngine()` may be called in either order; whichever runs second registers the eager
-  `AuthorizationTemplateServiceProvider`. The grant lookup
+  `AuthorizationTemplateServiceProvider`. **With `addRivet()`, System Admin group members see an
+  administration menu** in `rvt_page`'s header; `$adminMenu` sets its label and position, and `null` opts
+  out. The grant lookup
   resolves the shared `Capsule`, so `addIlluminateDatabase()` must also have been called.
 - `withLogger(LoggerInterface $logger)` replaces the default logger (see below).
 - **Config failures are wrapped** in `Guild\Framework\Exception\ConfigurationException` (a `LogicException`)
@@ -285,6 +287,13 @@ that file:
   `can(enum('App\\AppPermission').DocumentsUpdate, document)` (Twig) are equivalent; an unknown value
   throws `ConfigurationException` at render. Templates are not statically analysed, so the value string
   loses nothing a case would have caught.
+- **`rvt_page` asks for its header items at render time.** `RivetServiceProvider` builds the renderer with
+  `Rivet\ContainerNavigation`, which delegates to whatever the container binds under
+  `Guild\Rivet\Page\NavigationProvider` — `AdminNavigation` when authorization is added with a menu — and
+  otherwise returns the configured `PageDefaults::$navItems`. The lookup happens per page, which is what
+  lets `addRivet()` and `addAuthorization()` be called in either order. `AdminNavigation` never throws for
+  an unanswerable System Admin check; it leaves the menu out. The menu is cosmetic: the `/framework`
+  routes must gate themselves.
 - **`View::render()` unwraps `AuthorizationUnavailableException`.** Twig wraps anything thrown inside a
   template function in `Twig\Error\RuntimeError`; Latte does not. `View` rethrows the unavailable exception
   as itself under both engines so an application's 503 handling sees it. Everything else stays wrapped,

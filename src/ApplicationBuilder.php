@@ -6,6 +6,7 @@ namespace Guild\Framework;
 
 use Error;
 use Guild\Access\Authentication\OIDC\OidcConfiguration;
+use Guild\Framework\Authorization\AdminMenu;
 use Guild\Framework\Authorization\AuthorizationConfiguration;
 use Guild\Framework\Authorization\IdentitySource;
 use Guild\Framework\Authorization\Permission;
@@ -78,13 +79,19 @@ readonly class ApplicationBuilder
      * constructor dependencies need autowiring or explicit bindings.
      *
      * With a template engine configured, before or after this call, templates
-     * get can() and cannot().
+     * get can() and cannot(). With addRivet(), members of the System Admin
+     * group see an administration menu in rvt_page's header, placed by
+     * $adminMenu; pass null to leave the header alone.
      *
      * @param  class-string<Permission>  $permissions  The application's permission enum.
      * @param  list<class-string>  $policies  Policy classes, each declaring #[HandlesResource].
      */
-    public function addAuthorization(IdentitySource $identitySource, string $permissions, array $policies = []): self
-    {
+    public function addAuthorization(
+        IdentitySource $identitySource,
+        string $permissions,
+        array $policies = [],
+        ?AdminMenu $adminMenu = new AdminMenu(),
+    ): self {
         if ($identitySource === IdentitySource::Oidc && ! $this->app->isAuthenticationAdded()) {
             throw new ConfigurationException(
                 'addAuthorization() was given IdentitySource::Oidc, but addAuthentication() has not been called. '
@@ -110,7 +117,13 @@ readonly class ApplicationBuilder
             );
         }
 
-        $this->app->addServiceProvider(new AuthorizationServiceProvider($identitySource, $permissions, $config, $policies));
+        $this->app->addServiceProvider(new AuthorizationServiceProvider(
+            $identitySource,
+            $permissions,
+            $config,
+            $policies,
+            $adminMenu,
+        ));
         $this->app->setAuthorizationPermissions($permissions);
 
         $engine = $this->app->getTemplateEngine();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Guild\Framework\ServiceProvider;
 
+use Guild\Framework\Rivet\ContainerNavigation;
 use Guild\Framework\TemplateEngine;
 use Guild\Rivet\Latte\RivetExtension as LatteRivetExtension;
 use Guild\Rivet\Page\PageDefaults;
@@ -57,7 +58,11 @@ class RivetServiceProvider extends AbstractServiceProvider implements BootableSe
         // that makes ViewServiceProvider the worst offender in this repo's static
         // analysis. These are cheap objects; constructing them directly keeps the types.
         $registry = Rivet::registry();
-        $renderer = new Renderer($registry, pageDefaults: $this->pageDefaults);
+        $renderer = new Renderer(
+            $registry,
+            pageDefaults: $this->pageDefaults,
+            navigation: new ContainerNavigation($container),
+        );
 
         $container->addShared(ComponentRegistry::class, $registry);
         $container->addShared(Renderer::class, $renderer);

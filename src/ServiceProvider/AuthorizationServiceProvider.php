@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Guild\Framework\ServiceProvider;
 
 use Guild\Access\Authentication\OIDC\OidcAuthenticationService;
+use Guild\Framework\Authorization\AdminMenu;
+use Guild\Framework\Authorization\AdminNavigation;
 use Guild\Framework\Authorization\AuthorizationConfiguration;
 use Guild\Framework\Authorization\Gate;
 use Guild\Framework\Authorization\GrantRepository;
@@ -19,6 +21,7 @@ use Guild\Framework\Authorization\Permission;
 use Guild\Framework\Authorization\Policy\PolicyRegistry;
 use Guild\Framework\Authorization\UserResolver;
 use Guild\Grouper\GrouperClient;
+use Guild\Rivet\Page\NavigationProvider;
 use GuzzleHttp\Client;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use League\Container\ServiceProvider\AbstractServiceProvider;
@@ -36,6 +39,7 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
         private readonly string $permissionEnum,
         private readonly AuthorizationConfiguration $config,
         private readonly array $policies = [],
+        private readonly ?AdminMenu $adminMenu = new AdminMenu(),
     ) {
     }
 
@@ -52,6 +56,10 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
             GrouperClient::class,
             AuthorizationConfiguration::class,
         ];
+
+        if ($this->adminMenu !== null) {
+            $services[] = NavigationProvider::class;
+        }
 
         return in_array($id, $services, true);
     }
@@ -145,5 +153,18 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
 
             return new Gate($users, $policies, $permissionEnum);
         });
+
+        $adminMenu = $this->adminMenu;
+
+        if ($adminMenu !== null) {
+            $container->addShared(NavigationProvider::class, static function () use ($container, $adminMenu): NavigationProvider {
+                /** @var UserResolver $users */
+                $users = $container->get(UserResolver::class);
+                /** @var ServerRequestInterface $request */
+                $request = $container->get(ServerRequestInterface::class);
+
+                return new AdminNavigation($users, $adminMenu, $request);
+            });
+        }
     }
 }

@@ -6,6 +6,8 @@ namespace Guild\Framework\Test;
 
 use Guild\Framework\Application;
 use Guild\Framework\ApplicationBuilder;
+use Guild\Framework\Authorization\AdminMenu;
+use Guild\Framework\Authorization\AdminNavigation;
 use Guild\Framework\Authorization\AuthorizationConfiguration;
 use Guild\Framework\Authorization\Gate;
 use Guild\Framework\Authorization\GrantRepository;
@@ -21,6 +23,11 @@ use Guild\Framework\Exception\ConfigurationException;
 use Guild\Framework\ServiceProvider\AuthenticationServiceProvider;
 use Guild\Framework\ServiceProvider\AuthorizationServiceProvider;
 use Guild\Framework\ServiceProvider\AuthorizationTemplateServiceProvider;
+use Guild\Framework\ServiceProvider\RivetServiceProvider;
+use Guild\Framework\Rivet\ContainerNavigation;
+use Guild\Rivet\Page\NavigationProvider;
+use Guild\Rivet\Page\PageDefaults;
+use Guild\Rivet\Render\Renderer;
 use Guild\Framework\ServiceProvider\ViewServiceProvider;
 use Guild\Framework\TemplateEngine;
 use Guild\Framework\View;
@@ -42,6 +49,10 @@ use Psr\Log\NullLogger;
 #[CoversClass(AuthorizationServiceProvider::class)]
 #[CoversClass(AuthorizationTemplateServiceProvider::class)]
 #[UsesClass(ViewServiceProvider::class)]
+#[UsesClass(RivetServiceProvider::class)]
+#[UsesClass(ContainerNavigation::class)]
+#[UsesClass(AdminMenu::class)]
+#[UsesClass(AdminNavigation::class)]
 #[UsesClass(View::class)]
 #[UsesClass(TemplateAuthorization::class)]
 #[UsesClass(TwigAuthorizationExtension::class)]
@@ -139,6 +150,42 @@ final class ApplicationBuilderAuthorizationTest extends TestCase
 
         self::assertInstanceOf(View::class, $view, 'the view is registered');
         self::assertSame('guest', $view->render($template), 'cannot() is available and a CLI request is a guest');
+    }
+
+    public function testTheAdminMenuIsBoundUnlessTheApplicationOptsOut(): void
+    {
+        $withMenu = Application::configure($this->basePath)
+            ->addIlluminateDatabase()
+            ->addAuthorization(IdentitySource::Cas, TestPermission::class)
+            ->create();
+        $withoutMenu = Application::configure($this->basePath)
+            ->addIlluminateDatabase()
+            ->addAuthorization(IdentitySource::Cas, TestPermission::class, adminMenu: null)
+            ->create();
+
+        self::assertInstanceOf(AdminNavigation::class, $withMenu->get(NavigationProvider::class), 'the menu is on by default');
+        self::assertFalse($withoutMenu->has(NavigationProvider::class), 'null leaves the header alone');
+    }
+
+    public function testRivetPagesAskTheAuthorizationLayerEvenWhenItIsAddedAfterRivet(): void
+    {
+        $defaults = new PageDefaults(appTitle: 'Course Catalog', navItems: [['label' => 'Courses', 'href' => '/courses']]);
+
+        $app = Application::configure($this->basePath)
+            ->addIlluminateDatabase()
+            ->addTemplateEngine(TemplateEngine::Twig)
+            ->addRivet($defaults)
+            ->addAuthorization(IdentitySource::Cas, TestPermission::class)
+            ->create();
+
+        $renderer = $app->get(Renderer::class);
+
+        self::assertInstanceOf(Renderer::class, $renderer, 'Rivet is registered');
+        self::assertSame(
+            $defaults->navItems,
+            $renderer->context()->navItems($defaults),
+            'a CLI request is a guest, so the menu is left out and nothing throws',
+        );
     }
 
     public function testAnOidcApplicationMustAddAuthenticationFirst(): void
