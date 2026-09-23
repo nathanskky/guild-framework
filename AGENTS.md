@@ -104,7 +104,10 @@ builder is a readonly, fluent object — each `add*` method wires one concern in
 Application::configure($basePath)
     ->enableAutoWiring()
     ->addIlluminateDatabase()
-    ->addAuthentication()
+    ->addAuthentication()           // OIDC only; a CAS application omits it
+    ->addTemplateEngine(TemplateEngine::Twig)
+    ->addRivet($pageDefaults)
+    ->addAuthorization(IdentitySource::Oidc, AppPermission::class, policies: [DocumentPolicy::class])
     ->addRouting()
     ->create()
     ->run();
@@ -249,8 +252,10 @@ that file:
 | `addAuthorization()` | `config/authorization.php` — plus arguments for the code-level facts; with OIDC, requires `addAuthentication()` first |
 | `enableAutoWiring()` | none |
 
-`guild/starter` is the worked example: it does not call `addAuthentication()`, so its
-`config/authentication.php` is never loaded and the app runs without it.
+`guild/starter` is the worked example: it does not call `addAuthentication()`, and its
+`addAuthorization()` call is committed commented out, so neither `config/authentication.php` nor
+`config/authorization.php` is loaded and the app runs without them. Its `AGENTS.md` lists the steps to turn
+authorization on.
 
 ## Landmines
 
