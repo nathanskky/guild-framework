@@ -26,10 +26,10 @@ root-level tooling or a shared root autoloader.
 |---|---|---|
 | `guild/framework` *(this one)* | `Guild\Framework\` | Application kernel / DI container |
 | `guild/access` | `Guild\Access\` | IU Login (OIDC) authentication library. **This package depends on it** (`^1.0`, via VCS repo) |
-| `guild/grouper` | `Guild\Grouper\` | Read-only IU Grouper group-membership lookup. **This package depends on it** (`^0.1.1`, via VCS repo). Pre-1.0 — treat minor releases as potentially breaking |
+| `guild/grouper` | `Guild\Grouper\` | Read-only IU Grouper group-membership lookup. **This package depends on it** (`^0.1.2`, via VCS repo). Pre-1.0 — treat minor releases as potentially breaking |
 | `guild/starter` | `Guild\Starter\` | Runnable example app; the primary consumer of this package |
 | `iu/notifications` | `IU\Notifications\` | IU Notifications API client. Fully independent — different GitHub host, and its `<8.5` PHP constraint is mutually exclusive with this package's `~8.5.0` |
-| `guild/rivet` | `Guild\Rivet\` | IU Rivet Design System components. Will be exposed via `ApplicationBuilder::addRivet()` |
+| `guild/rivet` | `Guild\Rivet\` | IU Rivet Design System components for Twig and Latte, exposed through `ApplicationBuilder::addRivet()`. **This package depends on it** (`dev-develop`, via VCS repo) |
 
 `access/README.md` is the authoritative reference for the OIDC library's config fields, redirect-safety
 rules, session handling, and error types. Read it before touching anything auth-related here.
@@ -91,6 +91,7 @@ The framework wires several third-party libraries into one application container
 - **`robmorgan/phinx`** — migrations
 - **`guild/access`** — OIDC authentication primitives
 - **`guild/grouper`** — read-only Grouper group-membership lookup, for the authorization layer
+- **`guzzlehttp/guzzle`** — the HTTP client handed to `GrouperClient`, with the configured Grouper timeouts
 - **`monolog/monolog`** — the default `Psr\Log\LoggerInterface` binding
 - **`guild/rivet`** — IU Rivet Design System components for both engines
 
@@ -138,14 +139,14 @@ Application::configure($basePath)
   `require` one at the call site.
 - `addTemplateEngine(TemplateEngine $engine)` registers `ViewServiceProvider`, binding `View::class` plus
   whichever backing engine matches the enum case (`Twig` → `Twig\Environment`/`FilesystemLoader`; `Latte` →
-  `Latte\Engine`/`FileLoader`). Unlike the two methods above, this **takes the enum directly rather than
-  reading a config file — there is no `config/view.php`.** Both engines load templates from
-  `{basePath}/templates` by convention. `View::render()` dispatches to `Environment::render()` or
+  `Latte\Engine`/`FileLoader`). Unlike `addAuthentication()` and `addIlluminateDatabase()`, this **takes
+  the enum directly rather than reading a config file — there is no `config/view.php`.** Both engines load
+  templates from `{basePath}/templates` by convention. `View::render()` dispatches to `Environment::render()` or
   `Engine::renderToString()` depending on which engine is bound.
 - `addAuthorization(IdentitySource $identitySource, string $permissions, array $policies = [], ?AdminMenu $adminMenu = new AdminMenu())` requires
   `{basePath}/config/authorization.php`, which must return an `AuthorizationConfiguration` (Grouper
   connection settings, the System Admin group's ACM label, the membership TTL and stale cap, Grouper
-  timeouts). It is the first `add*()` method that takes arguments **and** reads a config file, and the split
+  timeouts). It is the only `add*()` method that takes arguments **and** reads a config file, and the split
   is deliberate: **arguments carry code-level facts** — the identity source and the application's
   `Permission` enum class, which PHPStan and an IDE can check — **the config file carries everything that
   varies by deployment**, including the Grouper secret. With `IdentitySource::Oidc` it **must be called
@@ -158,8 +159,8 @@ Application::configure($basePath)
   `addTemplateEngine()` may be called in either order; whichever runs second registers the eager
   `AuthorizationTemplateServiceProvider`. **With `addRivet()`, System Admin group members see an
   administration menu** in `rvt_page`'s header; `$adminMenu` sets its label and position, and `null` opts
-  out. The grant lookup
-  resolves the shared `Capsule`, so `addIlluminateDatabase()` must also have been called.
+  out. The grant lookup resolves the shared `Capsule`, so `addIlluminateDatabase()` must also have been
+  called.
 - `withLogger(LoggerInterface $logger)` replaces the default logger (see below).
 - **Config failures are wrapped** in `Guild\Framework\Exception\ConfigurationException` (a `LogicException`)
   by `addAuthentication()`, `addIlluminateDatabase()` and `addAuthorization()`, rather than letting the
@@ -175,13 +176,13 @@ Application::configure($basePath)
   `routes/routes.php` surfaces as a raw `require` failure. And if the file loads but returns something that
   is not callable, the `is_callable()` guard means **no routes are registered and no error is raised** —
   every request 404s with nothing to explain why. If you are adding a config-driven `add*` method, follow
-  the wrapping pattern of the first two rather than `addRouting()`.
+  the wrapping pattern of the other three rather than `addRouting()`.
 
 ### Request lifecycle
 
 `Application::run()` pulls `Router`, `SapiEmitter`, and `ServerRequestInterface` out of the container (all
 bound in `Application::registerBaseBindings()`), dispatches the request through the router, and emits the
-response. `Router` itself has no added behavior yet — it exists as a named extension point over
+response. `Router` itself adds no behavior — it exists as a named extension point over
 `League\Route\Router` so routing can be customized later without changing the public API.
 
 ### Container path bindings
@@ -193,8 +194,12 @@ this rather than resolving paths itself, so **any new config-driven `add*` metho
 
 ### Migrations
 
-Eloquent models in `src/Model/` back Phinx migrations in `db/migrations/` — `groups`, `roles`,
-`groups_roles`, `role_permissions`, all with a `framework_` table prefix.
+Eloquent models in `src/Model/` (`Group`, `Role`, `RolePermission`) back Phinx migrations in
+`db/migrations/` — `groups`, `roles`, `groups_roles`, `role_permissions`, all with a `framework_` table
+prefix. `groups.group_identifier` holds the Grouper system name that membership is matched on;
+`groups.name` is a free local label. Unique indexes cover `groups.group_identifier`, `groups.name`,
+`roles.name`, `groups_roles (group_id, role_id)` and `role_permissions (role_id, name)`, where
+`role_permissions.name` is the value of a case of the application's `Permission` enum.
 
 Migrations **cannot be run from this repo** — see Landmines for why and for the real command.
 
@@ -216,13 +221,19 @@ anything it enforces — don't hand-fix a style issue Pint would catch, and don'
 patterns below are *observed*, not a style guide, and cover only what Pint doesn't decide.
 
 - **Use `final` and `readonly` where they make sense for the class in front of you** — not to match what
-  neighboring classes or sibling packages happen to do. Today `Application` is `final`, `ApplicationBuilder`
-  and `View` are `readonly`, and `Router`, `ConfigurationException`, the service providers, and the models
-  are plain classes. That is the current state, not a policy to conform to; don't "fix" a class to match its
-  neighbors in either direction.
+  neighboring classes or sibling packages happen to do. `Application` is `final`; `ApplicationBuilder` and
+  `View` are `readonly`; almost everything under `Authorization/`, `Admin/`, `Controller/`, `Middleware/`
+  and `Rivet/` is `final`, most of it `final readonly`; `Router`, the exceptions, the service providers
+  and the models are plain classes. That is the current state, not a policy to conform to; don't "fix" a
+  class to match its neighbors in either direction.
   One thing genuinely worth weighing here: this is a library, so adding `final` to an already-published
   class is a breaking change for anyone extending it.
-- Directory names under `src/` are **singular**: `Controller`, `Model`, `Exception`, `ServiceProvider`.
+- Directory names under `src/` are **singular**: `Controller`, `Model`, `Exception`, `ServiceProvider`,
+  `Middleware`.
+- **Classes that are not public API carry `@internal`** — the admin pages' helpers (`Admin/`), the
+  controllers and middleware, `PolicyRegistry`, the membership cache and provider, `GrantRepository`,
+  `AdminNavigation`, `ContainerNavigation`, `TemplateAuthorization`, and `User`'s constructor. Keep that
+  marker on anything an application should not construct or type against.
 - **PHPStan level is 10 here.** Levels differ per package (`access` at `max`, `notification` at 5, `starter`
   has none). Do not assume one bar across the workspace.
 - Eloquent models are the one place typed properties are *not* used — they need untyped
@@ -284,17 +295,17 @@ authorization on.
 - **`Application::getPath()` throws on unknown resources.** It calls `$this->get('path.' . $resource)` with
   no existence check, so an unrecognized resource raises a container `NotFoundException` rather than
   returning `null` as its `?string` signature suggests. Only `path.base` and `path.config` are bound.
-- **Authorization is complete through its administration UI.** `/framework/authorization` registers
+- **Authorization groups and roles are managed at `/framework/authorization`.** The pages register
   Grouper groups from their ACM label (`findByLabel()`; one match registers, several are offered by
-  identifier, none and "Grouper unreachable" are reported differently), maps them to roles on the group's
-  page, and creates, edits and deletes roles and their grants. Deletes ask for confirmation and detach
+  identifier, none and "Grouper unreachable" are reported differently), map them to roles on the group's
+  page, and create, edit and delete roles and their grants. Deletes ask for confirmation and detach
   mappings and grants explicitly rather than relying on the foreign-key cascades. Every write sets
   `created_by`/`updated_by` to the administrator's username, pivot rows included.
-  `UserResolver::current()` returns a `User` or `null` for a guest. `Gate::allows()/denies()/authorize()`
-  take a case of the application's `Permission` enum and an optional resource. Without a resource the
-  user's roles decide; with one, the roles must grant the permission **and** the resource's policy method
-  (bound by `#[Handles]`) must agree. The System Admin group bypasses everything, except when membership
-  is stale. Read `AUTHORIZATION-PLANNING.md` at the workspace root before extending it.
+- **A resource check needs both the grant and the policy.** `UserResolver::current()` returns a `User`
+  or `null` for a guest. `Gate::allows()/denies()/authorize()` take a case of the application's
+  `Permission` enum and an optional resource. Without a resource the user's roles decide; with one, the
+  roles must grant the permission **and** the resource's policy method (bound by `#[Handles]`) must
+  agree. The System Admin group bypasses everything, except when membership is stale.
 - **Policy mistakes throw `ConfigurationException` on first use, for every user** — no policy for the
   resource's exact class, no `#[Handles]` method for the permission, duplicates, a non-`bool` return, a
   case from another enum, or a first parameter that is not `User`/`?User`. The policy is resolved before
@@ -340,6 +351,7 @@ authorization on.
   IU-provided image**; if framework warnings do not reach the log platform there, call `withLogger()` with a
   logger aimed at stderr. Apache prefixes every such line `[php:notice]` regardless of level; the
   `framework.WARNING:` text is the real level.
+
 ## Branching and pull requests
 
 **Do not commit directly to `develop`.** Work on a feature branch and open a pull request against
@@ -354,8 +366,8 @@ git push -u origin <short-descriptive-name>
 
 Then open a PR **targeting `develop`**, not `main`. Nothing routine should land on `main` directly.
 
-`composer test` is a known-red baseline here (empty `tests/`) — see
-[Verify your change](#verify-your-change). Don't let a PR add *new* failures beyond it.
+`composer analyse` has a known-red baseline here — see [Verify your change](#verify-your-change). Don't
+let a PR add *new* failures beyond it.
 
 ### Branch and release model
 
@@ -411,7 +423,14 @@ this *above* the existing VCS entries, then `composer update guild/framework`:
 **Never hand-edit `starter/vendor/guild/framework/`** — the next `composer install` reverts it and your
 change never reaches the real package.
 
-Note the mixed auth paths: this repo's `origin` is SSH, but it pulls `guild/access` over **HTTPS**, so
-`composer update` may prompt for GitHub credentials in places where `git push` works fine. Bumping
-`guild/access` additionally requires a **new git tag** in that repo, because the constraint here is `^1.0`
-(a tag constraint), not a branch.
+Note the mixed auth paths: this repo's `origin` is SSH, but it pulls `guild/access`, `guild/grouper` and
+`guild/rivet` over **HTTPS**, so `composer update` may prompt for GitHub credentials in places where
+`git push` works fine. Bumping `guild/access` or `guild/grouper` additionally requires a **new git tag** in
+that repo, because the constraints here (`^1.0`, `^0.1.2`) are tag constraints. `guild/rivet` is required
+as `dev-develop`, so it moves with that repo's `develop` on every `composer update`, as this package does
+for `starter`.
+
+Composer reads `repositories` only from the root package, so **every consumer declares the VCS
+repositories for `guild/access`, `guild/grouper` and `guild/rivet` as well as this one** — `starter` does.
+Adding a new VCS-hosted dependency here breaks every consumer's install until each adds its repository
+too.
