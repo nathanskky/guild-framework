@@ -12,6 +12,12 @@ use Guild\Framework\Exception\ConfigurationException;
  */
 final readonly class OidcIdentityReader implements IdentityReader
 {
+    /**
+     * IU Login releases the IU username as 'username' under both the openid
+     * and profile scopes (IU KB0024076). The discovery document's
+     * claims_supported omits it; that list is not exhaustive. Do not switch
+     * to 'sub', which may be a pairwise identifier.
+     */
     private const string USERNAME_CLAIM = 'username';
 
     public function __construct(private OidcAuthenticationService $authentication)
