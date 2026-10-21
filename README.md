@@ -29,7 +29,7 @@ application builds one container with a fluent `ApplicationBuilder`, opting in t
 
 ## Installation
 
-There is no tagged release; require the `develop` branch. Composer reads `repositories` only from your
+Composer reads `repositories` only from your
 application's own `composer.json`, so declare this package's VCS-hosted dependencies too:
 
 ```json
@@ -41,7 +41,7 @@ application's own `composer.json`, so declare this package's VCS-hosted dependen
         { "type": "vcs", "url": "https://github.com/nathanskky/guild-rivet.git" }
     ],
     "require": {
-        "guild/framework": "dev-develop"
+        "guild/framework": "^1.0"
     }
 }
 ```

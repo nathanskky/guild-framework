@@ -35,7 +35,7 @@
         "twig/twig": "^3.28",
         "latte/latte": "^3.1",
         "robmorgan/phinx": "^0.16.12",
-        "guild/rivet": "dev-develop",
+        "guild/rivet": "^1.0",
         "monolog/monolog": "^3.12",
         "guzzlehttp/guzzle": "^7.15"
     },

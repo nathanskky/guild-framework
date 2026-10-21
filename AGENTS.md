@@ -29,7 +29,7 @@ root-level tooling or a shared root autoloader.
 | `guild/grouper` | `Guild\Grouper\` | Read-only IU Grouper group-membership lookup. **This package depends on it** (`^0.1.2`, via VCS repo). Pre-1.0 — treat minor releases as potentially breaking |
 | `guild/starter` | `Guild\Starter\` | Runnable example app; the primary consumer of this package |
 | `iu/notifications` | `IU\Notifications\` | IU Notifications API client. Fully independent — different GitHub host, and its `<8.5` PHP constraint is mutually exclusive with this package's `~8.5.0` |
-| `guild/rivet` | `Guild\Rivet\` | IU Rivet Design System components for Twig and Latte, exposed through `ApplicationBuilder::addRivet()`. **This package depends on it** (`dev-develop`, via VCS repo) |
+| `guild/rivet` | `Guild\Rivet\` | IU Rivet Design System components for Twig and Latte, exposed through `ApplicationBuilder::addRivet()`. **This package depends on it** (`^1.0`, via VCS repo) |
 
 `access/README.md` is the authoritative reference for the OIDC library's config fields, redirect-safety
 rules, session handling, and error types. Read it before touching anything auth-related here.
@@ -382,14 +382,8 @@ feature branch  --PR-->  develop  --PR-->  main  --> tag (release)
   accumulated work is ready to release.
 - **Tags are applied to `main`** after that merge.
 
-This is the intended model across all the Guild packages. This package has not reached v1 yet, so `main`
-and tagging are not in use here today — but assume this flow for new work rather than inventing another.
-
-**One consequence specific to this package:** `guild/starter` requires `dev-develop`, which tracks the tip
-of `develop` directly rather than a tag. So **anything merged to `develop` reaches that consumer on its next
-`composer update`**, with no release step in between — a broken merge is felt immediately downstream. That
-is the opposite of `guild/access`, where consumers use a `^1.0` tag constraint and see nothing until a tag
-is cut.
+This is the model across all the Guild packages. Consumers, `guild/starter` included, require a `^1.0` tag
+constraint, so **work merged to `develop` reaches no consumer until it is merged to `main` and tagged**.
 
 ## Getting a change to consumers
 
@@ -416,19 +410,17 @@ this *above* the existing VCS entries, then `composer update guild/framework`:
 2. Confirm it is **merged and pushed** — this is the step people skip. Consumers declare a VCS repository
    at `https://github.com/nathanskky/guild-framework.git`, so Composer resolves from GitHub and cannot see
    local commits or an unmerged feature branch.
-3. In the consumer, `composer update guild/framework`. `starter` requires `dev-develop`, which tracks the
-   **tip of `develop`**, so a merged PR is picked up with no `composer.json` edit — and conversely, a
-   branch that is pushed but not yet merged is invisible to it.
+3. Merge `develop` to `main` and push a **new tag** on `main`. `starter` requires `^1.0`, so it sees
+   only tagged releases — a merge to `develop` alone is invisible to it.
+4. In the consumer, `composer update guild/framework`.
 
 **Never hand-edit `starter/vendor/guild/framework/`** — the next `composer install` reverts it and your
 change never reaches the real package.
 
 Note the mixed auth paths: this repo's `origin` is SSH, but it pulls `guild/access`, `guild/grouper` and
 `guild/rivet` over **HTTPS**, so `composer update` may prompt for GitHub credentials in places where
-`git push` works fine. Bumping `guild/access` or `guild/grouper` additionally requires a **new git tag** in
-that repo, because the constraints here (`^1.0`, `^0.1.2`) are tag constraints. `guild/rivet` is required
-as `dev-develop`, so it moves with that repo's `develop` on every `composer update`, as this package does
-for `starter`.
+`git push` works fine. Bumping `guild/access`, `guild/grouper` or `guild/rivet` additionally requires a
+**new git tag** in that repo, because the constraints here (`^1.0`, `^0.1.2`, `^1.0`) are tag constraints.
 
 Composer reads `repositories` only from the root package, so **every consumer declares the VCS
 repositories for `guild/access`, `guild/grouper` and `guild/rivet` as well as this one** — `starter` does.
