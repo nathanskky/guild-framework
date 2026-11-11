@@ -6,6 +6,10 @@ namespace Guild\Framework\Test;
 
 use Guild\Framework\Authorization\Membership\GrouperGroupDirectory;
 use Guild\Framework\Testing\ArraySessionStore;
+use Guild\Framework\Admin\Csrf;
+use Guild\Framework\Application;
+use Guild\Framework\ApplicationBuilder;
+use Guild\Framework\Authentication\SignOutForm;
 use Guild\Framework\Authorization\Gate;
 use Guild\Framework\Authorization\GrantRepository;
 use Guild\Framework\Authorization\Handles;
@@ -19,12 +23,20 @@ use Guild\Framework\Authorization\TemplateAuthorization;
 use Guild\Framework\Authorization\User;
 use Guild\Framework\Authorization\UserResolver;
 use Guild\Framework\Exception\AuthorizationUnavailableException;
+use Guild\Framework\Latte\AuthenticationExtension as LatteAuthenticationExtension;
 use Guild\Framework\Latte\AuthorizationExtension as LatteAuthorizationExtension;
+use Guild\Framework\ServiceProvider\AuthenticationServiceProvider;
+use Guild\Framework\ServiceProvider\AuthenticationTemplateServiceProvider;
+use Guild\Framework\ServiceProvider\FrameworkPageServiceProvider;
+use Guild\Framework\ServiceProvider\ViewServiceProvider;
+use Guild\Framework\Session\SessionStore;
+use Guild\Framework\TemplateEngine;
 use Guild\Grouper\Testing\FakeGrouper;
 use Guild\Framework\Test\Authorization\Support\GateFactory;
 use Guild\Framework\Test\Authorization\Support\GrantsDatabase;
 use Guild\Framework\Test\Authorization\Support\Policy\Document;
 use Guild\Framework\Test\Authorization\Support\TestPermission;
+use Guild\Framework\Twig\AuthenticationExtension as TwigAuthenticationExtension;
 use Guild\Framework\Twig\AuthorizationExtension as TwigAuthorizationExtension;
 use Guild\Framework\View;
 use Latte\Engine;
@@ -41,7 +53,17 @@ use Twig\Loader\ArrayLoader;
  */
 #[CoversClass(TwigAuthorizationExtension::class)]
 #[CoversClass(LatteAuthorizationExtension::class)]
+#[CoversClass(TwigAuthenticationExtension::class)]
+#[CoversClass(LatteAuthenticationExtension::class)]
+#[CoversClass(SignOutForm::class)]
+#[CoversClass(AuthenticationTemplateServiceProvider::class)]
 #[CoversClass(View::class)]
+#[UsesClass(Application::class)]
+#[UsesClass(ApplicationBuilder::class)]
+#[UsesClass(AuthenticationServiceProvider::class)]
+#[UsesClass(FrameworkPageServiceProvider::class)]
+#[UsesClass(ViewServiceProvider::class)]
+#[UsesClass(Csrf::class)]
 #[UsesClass(TemplateAuthorization::class)]
 #[UsesClass(Gate::class)]
 #[UsesClass(UserResolver::class)]
@@ -102,6 +124,63 @@ final class TemplateFunctionsTest extends TestCase
         $this->expectException(AuthorizationUnavailableException::class);
 
         $this->view($engine, $template, $gate)->render('t');
+    }
+
+    /**
+     * @return iterable<string, array{TemplateEngine, string, bool}>
+     */
+    public static function signOutForms(): iterable
+    {
+        yield 'Twig, authentication first' => [TemplateEngine::Twig, 'form.twig', true];
+        yield 'Twig, engine first' => [TemplateEngine::Twig, 'form.twig', false];
+        yield 'Latte, authentication first' => [TemplateEngine::Latte, 'form.latte', true];
+        yield 'Latte, engine first' => [TemplateEngine::Latte, 'form.latte', false];
+    }
+
+    #[DataProvider('signOutForms')]
+    public function testSignOutFormRendersTheProtectedFormUnescaped(TemplateEngine $engine, string $template, bool $authenticationFirst): void
+    {
+        $basePath = sys_get_temp_dir() . '/guild-framework-sign-out-form-' . bin2hex(random_bytes(6));
+        mkdir($basePath . '/config', recursive: true);
+        mkdir($basePath . '/templates');
+        file_put_contents($basePath . '/config/authentication.php', <<<'PHP'
+            <?php
+
+            return new Guild\Access\Authentication\OIDC\OidcConfiguration(
+                'https://idp.login.iu.edu', 'id', 'secret', 'https://app.iu.edu/cb',
+            );
+            PHP);
+        file_put_contents($basePath . '/templates/form.twig', '{{ sign_out_form() }}');
+        file_put_contents($basePath . '/templates/form.latte', '{sign_out_form()}');
+
+        try {
+            $builder = Application::configure($basePath);
+
+            $builder = $authenticationFirst
+                ? $builder->addAuthentication()->addTemplateEngine($engine)
+                : $builder->addTemplateEngine($engine)->addAuthentication();
+
+            $app = $builder->create();
+            $app->addShared(SessionStore::class, new ArraySessionStore(['guild_framework_csrf' => 'abc123']), overwrite: true);
+
+            $view = $app->get(View::class);
+            self::assertInstanceOf(View::class, $view);
+
+            self::assertSame(
+                '<form method="post" action="/framework/sign-out"><input type="hidden" name="_csrf" value="abc123">'
+                . '<button type="submit" class="rvt-button rvt-button--secondary">Sign out</button></form>',
+                $view->render($template),
+                "{$engine->name} renders the form with the session's token, as markup",
+            );
+        } finally {
+            foreach ([...(glob($basePath . '/config/*') ?: []), ...(glob($basePath . '/templates/*') ?: [])] as $file) {
+                unlink($file);
+            }
+
+            rmdir($basePath . '/config');
+            rmdir($basePath . '/templates');
+            rmdir($basePath);
+        }
     }
 
     private function view(string $engine, string $template, Gate $gate): View

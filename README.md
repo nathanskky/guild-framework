@@ -143,6 +143,23 @@ $router->lazyMiddleware(RequireSignIn::class);
 See the [`guild/access` README](https://github.com/nathanskky/guild-access) for the configuration fields,
 redirect rules and session handling.
 
+### Signing out
+
+`addAuthentication()` mounts `POST /framework/sign-out`, which ends the visitor's session. It accepts only
+a form that carries the session's CSRF token, so a link or a `GET` cannot sign anyone out. Templates get
+`sign_out_form()`, which renders the whole form with a **Sign out** button; call `addAuthentication()` and
+`addTemplateEngine()` in either order.
+
+```twig
+{{ sign_out_form() }}
+```
+
+```latte
+{sign_out_form()}
+```
+
+The visitor lands on IU Login's own logout page.
+
 ### `addTemplateEngine()`
 
 Takes `TemplateEngine::Twig` or `TemplateEngine::Latte` and binds `Guild\Framework\View`, which loads

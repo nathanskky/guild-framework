@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Guild\Framework;
 
+use Guild\Framework\ServiceProvider\FrameworkPageServiceProvider;
 use Guild\Framework\Session\NativeSessionStore;
 use Guild\Framework\Session\SessionStore;
 use Laminas\Diactoros\ServerRequestFactory;
@@ -118,6 +119,7 @@ final class Application extends Container
         });
         $this->addShared(SapiEmitter::class);
         $this->addShared(SessionStore::class, NativeSessionStore::class);
+        $this->addServiceProvider(new FrameworkPageServiceProvider());
         $this->addShared(LoggerInterface::class, static fn (): LoggerInterface => new Logger(
             'framework',
             [new ErrorLogHandler()],

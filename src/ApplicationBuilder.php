@@ -11,12 +11,14 @@ use Guild\Framework\Authorization\AuthorizationConfiguration;
 use Guild\Framework\Authorization\IdentitySource;
 use Guild\Framework\Authorization\Membership\GrouperDirectoryConfiguration;
 use Guild\Framework\Authorization\Permission;
+use Guild\Framework\Controller\Authentication\SignOutController;
 use Guild\Framework\Exception\ConfigurationException;
 use Guild\Framework\Middleware\AuthorizationFailureResponder;
 use Guild\Framework\Middleware\RequireSignIn;
 use Guild\Framework\Middleware\RequireSystemAdmin;
 use Guild\Framework\Middleware\VerifyCsrfToken;
 use Guild\Framework\ServiceProvider\AuthenticationServiceProvider;
+use Guild\Framework\ServiceProvider\AuthenticationTemplateServiceProvider;
 use Guild\Framework\ServiceProvider\AuthorizationServiceProvider;
 use Guild\Framework\ServiceProvider\AuthorizationTemplateServiceProvider;
 use Guild\Framework\ServiceProvider\RivetServiceProvider;
@@ -67,8 +69,31 @@ readonly class ApplicationBuilder
 
         $this->app->addServiceProvider(new AuthenticationServiceProvider($config));
         $this->app->markAuthenticationAdded();
+        $this->registerSignOutRoute();
+
+        $engine = $this->app->getTemplateEngine();
+
+        if ($engine !== null) {
+            $this->app->addServiceProvider(new AuthenticationTemplateServiceProvider($engine));
+        }
 
         return $this;
+    }
+
+    /**
+     * Mount POST /framework/sign-out on the shared Router. Only POST is a route,
+     * and VerifyCsrfToken checks the form's token before the sign-in method runs.
+     */
+    private function registerSignOutRoute(): void
+    {
+        $router = $this->app->get(Router::class);
+
+        if (! $router instanceof Router) {
+            throw new ConfigurationException('The container did not return a Router.');
+        }
+
+        $router->map('POST', '/framework/sign-out', [SignOutController::class, 'signOut'])
+            ->lazyMiddleware(VerifyCsrfToken::class);
     }
 
     /**
@@ -281,6 +306,10 @@ readonly class ApplicationBuilder
 
         if ($permissions !== null) {
             $this->app->addServiceProvider(new AuthorizationTemplateServiceProvider($engine, $permissions));
+        }
+
+        if ($this->app->isAuthenticationAdded()) {
+            $this->app->addServiceProvider(new AuthenticationTemplateServiceProvider($engine));
         }
 
         return $this;

@@ -122,7 +122,11 @@ Application::configure($basePath)
   `OidcConfiguration` instance specifically (checked with `instanceof`, not against an interface). It is
   handed to `AuthenticationServiceProvider`, which lazily registers `OidcConfiguration`,
   `OidcAuthenticationService`, `OidcAuthenticationMiddleware`, `SignInMethod` (bound to `IuLoginSignIn`) and
-  `RequireSignIn`.
+  `RequireSignIn`. It also mounts `POST /framework/sign-out` (`Controller\Authentication\SignOutController`,
+  behind `VerifyCsrfToken`), which hands the request to `SignInMethod::signOut()`. Templates get
+  `sign_out_form()`, which renders the CSRF-protected form (`Authentication\SignOutForm`); `addAuthentication()`
+  and `addTemplateEngine()` may be called in either order, and whichever runs second registers the eager
+  `AuthenticationTemplateServiceProvider`.
 - `addIlluminateDatabase()` requires `{basePath}/config/database.php` returning an Eloquent connection
   array. It boots a global `Illuminate\Database\Capsule\Manager` and shares it in the container.
 - `enableAutoWiring()` adds a `League\Container\ReflectionContainer` as a delegate, so
@@ -336,6 +340,9 @@ authorization on.
   `VerifyCsrfToken` (any non-GET must carry the session's `_csrf` field). `Admin\AdminPage` renders through
   the application's Rivet `Renderer` when `addRivet()` was called, else through a fallback whose navigation
   is the admin menu alone. Controllers and middleware are bound explicitly, so no autowiring is needed.
+  `AdminPage`, `Csrf` and `VerifyCsrfToken` are bound by `FrameworkPageServiceProvider`, which
+  `Application` registers with its base bindings, so the sign-out route uses them without
+  `addAuthorization()` or `addRivet()`.
 - **Eloquent query-builder calls lose model types under PHPStan.** Without Larastan, `->orderBy()` and
   other calls forwarded to the query builder make `->get()` return `Collection<int, stdClass>`. Load the
   models, then sort the collection (`->get()->sortBy('name')`); the models' `@property` tags then type
