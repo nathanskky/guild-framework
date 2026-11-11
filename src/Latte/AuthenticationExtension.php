@@ -20,6 +20,7 @@ final class AuthenticationExtension extends Extension
     {
     }
 
+    #[\Override]
     public function getFunctions(): array
     {
         return [

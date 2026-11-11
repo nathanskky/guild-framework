@@ -26,11 +26,13 @@ use League\Container\ServiceProvider\AbstractServiceProvider;
  */
 class FrameworkPageServiceProvider extends AbstractServiceProvider
 {
+    #[\Override]
     public function provides(string $id): bool
     {
         return in_array($id, [AdminPage::class, Csrf::class, VerifyCsrfToken::class], true);
     }
 
+    #[\Override]
     public function register(): void
     {
         $container = $this->getContainer();

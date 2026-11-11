@@ -31,6 +31,7 @@ class AuthenticationTemplateServiceProvider extends AbstractServiceProvider impl
     {
     }
 
+    #[\Override]
     public function boot(): void
     {
         $container = $this->getContainer();
@@ -56,6 +57,7 @@ class AuthenticationTemplateServiceProvider extends AbstractServiceProvider impl
         }
     }
 
+    #[\Override]
     public function provides(string $id): bool
     {
         return false;
@@ -65,6 +67,7 @@ class AuthenticationTemplateServiceProvider extends AbstractServiceProvider impl
      * Deliberately empty: boot() does all the work, and this provider binds no
      * services of its own.
      */
+    #[\Override]
     public function register(): void
     {
     }

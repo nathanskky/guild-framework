@@ -7,6 +7,7 @@ namespace Guild\Framework\Test\Authentication;
 use Guild\Framework\Admin\AdminPage;
 use Guild\Framework\Admin\Csrf;
 use Guild\Framework\Application;
+use Guild\Framework\ApplicationBuilder;
 use Guild\Framework\Authentication\SignInMethod;
 use Guild\Framework\Controller\Authentication\SignOutController;
 use Guild\Framework\Middleware\VerifyCsrfToken;
@@ -30,6 +31,7 @@ use Psr\Log\NullLogger;
  * nothing else, so no authorization layer and no Rivet.
  */
 #[CoversClass(SignOutController::class)]
+#[CoversClass(ApplicationBuilder::class)]
 #[UsesClass(Application::class)]
 #[UsesClass(AuthenticationServiceProvider::class)]
 #[UsesClass(FrameworkPageServiceProvider::class)]
