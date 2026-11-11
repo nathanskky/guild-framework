@@ -61,6 +61,53 @@ final class ExtensionDiscoveryTest extends TestCase
         self::assertInstanceOf(RecordingExtension::class, $extensions[1], 'zeta/recording comes second');
     }
 
+    public function testADevExtensionIsSkippedWhenDevPackagesAreNotInstalled(): void
+    {
+        $missing = $this->root . '/not-autoloaded';
+
+        $discovery = ExtensionDiscovery::fromInstalledData([
+            self::dataset(dev: false, versions: ['acme/dev-tools' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $missing, devRequirement: true)]),
+        ]);
+
+        self::assertSame([], $discovery->extensions(), 'after dump-autoload --no-dev the package is listed but its classes are not loadable');
+    }
+
+    public function testADevExtensionIsFoundWhenDevPackagesAreInstalled(): void
+    {
+        $path = $this->package(['extra' => ['guild' => ['extension' => RecordingExtension::class]]]);
+
+        $discovery = ExtensionDiscovery::fromInstalledData([
+            self::dataset(dev: true, versions: ['acme/dev-tools' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $path, devRequirement: true)]),
+        ]);
+
+        self::assertCount(1, $discovery->extensions(), 'a development install discovers its require-dev extensions');
+    }
+
+    public function testPackagesOfOtherTypesAreIgnored(): void
+    {
+        $discovery = ExtensionDiscovery::fromInstalledData([
+            self::dataset(dev: true, versions: [
+                'acme/library' => self::installed('library', $this->root . '/library'),
+                'acme/virtual' => ['pretty_version' => '1.0.0', 'provided' => ['1.0.0']],
+            ]),
+        ]);
+
+        self::assertSame([], $discovery->extensions(), 'only guild-extension packages with an install path are extensions');
+    }
+
+    public function testAPackageListedInTwoDatasetsIsFoundOnce(): void
+    {
+        $path = $this->package(['extra' => ['guild' => ['extension' => RecordingExtension::class]]]);
+        $entry = ['acme/recording' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $path)];
+
+        $discovery = ExtensionDiscovery::fromInstalledData([
+            self::dataset(dev: true, versions: $entry),
+            self::dataset(dev: true, versions: ['acme/recording' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $this->root . '/elsewhere')]),
+        ]);
+
+        self::assertCount(1, $discovery->extensions(), 'a package seen by two vendor directories is built once, from the first');
+    }
+
     public function testAPackageWithoutAnExtensionClassIsRejected(): void
     {
         $path = $this->package(['extra' => ['guild' => []]]);
@@ -132,5 +179,22 @@ final class ExtensionDiscoveryTest extends TestCase
         file_put_contents($path . '/composer.json', json_encode($composer, JSON_THROW_ON_ERROR));
 
         return $path;
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $versions
+     * @return array<string, mixed>
+     */
+    private static function dataset(bool $dev, array $versions): array
+    {
+        return ['root' => ['name' => 'acme/app', 'type' => 'project', 'dev' => $dev], 'versions' => $versions];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function installed(string $type, string $installPath, bool $devRequirement = false): array
+    {
+        return ['pretty_version' => '1.0.0', 'type' => $type, 'install_path' => $installPath, 'dev_requirement' => $devRequirement];
     }
 }

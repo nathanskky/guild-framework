@@ -33,13 +33,43 @@ final readonly class ExtensionDiscovery
      */
     public static function fromComposer(): self
     {
+        return self::fromInstalledData(InstalledVersions::getAllRawData());
+    }
+
+    /**
+     * The guild-extension packages in Composer's installed data, in the shape
+     * InstalledVersions::getAllRawData() returns: one dataset per vendor
+     * directory, the first naming a package winning.
+     *
+     * A dev package is skipped when its dataset was installed without dev
+     * packages. After composer dump-autoload --no-dev the package is still in
+     * vendor/ and still listed, but its classes are not autoloaded, so
+     * building it would fail production boot.
+     *
+     * @param  array<mixed>  $datasets
+     */
+    public static function fromInstalledData(array $datasets): self
+    {
         $installPaths = [];
 
-        foreach (InstalledVersions::getInstalledPackagesByType(self::PACKAGE_TYPE) as $package) {
-            $path = InstalledVersions::getInstallPath($package);
+        foreach ($datasets as $dataset) {
+            $root = is_array($dataset) ? $dataset['root'] ?? null : null;
+            $versions = is_array($dataset) ? $dataset['versions'] ?? null : null;
+            $devInstalled = is_array($root) && ($root['dev'] ?? false) === true;
 
-            if ($path !== null) {
-                $installPaths[$package] = $path;
+            foreach (is_array($versions) ? $versions : [] as $package => $version) {
+                if (
+                    ! is_string($package)
+                    || isset($installPaths[$package])
+                    || ! is_array($version)
+                    || ($version['type'] ?? null) !== self::PACKAGE_TYPE
+                    || ! is_string($version['install_path'] ?? null)
+                    || (($version['dev_requirement'] ?? false) === true && ! $devInstalled)
+                ) {
+                    continue;
+                }
+
+                $installPaths[$package] = $version['install_path'];
             }
         }
 

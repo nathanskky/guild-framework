@@ -446,7 +446,8 @@ by its Grouper name answer 503; editing, mapping and unregistering groups still 
 
 `Application::configure($basePath, $extensions)` takes an explicit list instead, which is how tests boot
 an application with the extensions they want. A `composer install --no-dev` build never discovers an
-extension that was installed with `require-dev`.
+extension that was installed with `require-dev`, and neither does `composer dump-autoload --no-dev` run over a
+development install.
 
 ## Upgrading to 2.0
 
