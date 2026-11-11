@@ -129,11 +129,13 @@ return [
 
 `config/authentication.php` returns a `Guild\Access\Authentication\OIDC\OidcConfiguration`. The
 container then provides `OidcAuthenticationService`, `OidcAuthenticationMiddleware` and
-`Guild\Framework\Authentication\SignInMethod`; add the middleware to the routes that need a signed-in user:
+`Guild\Framework\Authentication\SignInMethod`; add `RequireSignIn` to the routes that need a signed-in user:
 
 ```php
-$router->lazyMiddleware(OidcAuthenticationMiddleware::class);
+$router->lazyMiddleware(RequireSignIn::class);
 ```
+
+`OidcAuthenticationMiddleware` still works, but always uses IU Login.
 
 See the [`guild/access` README](https://github.com/nathanskky/guild-access) for the configuration fields,
 redirect rules and session handling.
@@ -346,7 +348,7 @@ both engines. The System Admin check never uses stale membership.
 
 `addAuthorization()` mounts pages at `/framework/authorization`, gated on the System Admin group, where
 administrators register Grouper groups by ACM label, map them to roles, and create, edit and delete roles
-and their grants. Under OIDC a guest is sent to log in; under CAS, protect `/framework` in the Apache
+and their grants. Under OIDC a guest is asked to sign in; under CAS, protect `/framework` in the Apache
 configuration. With `addRivet()` the pages use the application's `rvt_page` layout, and System Admins see
 a **System settings** menu in its header; pass `adminMenu: null` to leave the header alone.
 

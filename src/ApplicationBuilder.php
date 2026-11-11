@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Guild\Framework;
 
 use Error;
-use Guild\Access\Authentication\OIDC\OidcAuthenticationMiddleware;
 use Guild\Access\Authentication\OIDC\OidcConfiguration;
 use Guild\Framework\Authorization\AdminMenu;
 use Guild\Framework\Authorization\AuthorizationConfiguration;
@@ -13,6 +12,7 @@ use Guild\Framework\Authorization\IdentitySource;
 use Guild\Framework\Authorization\Membership\GrouperDirectoryConfiguration;
 use Guild\Framework\Authorization\Permission;
 use Guild\Framework\Exception\ConfigurationException;
+use Guild\Framework\Middleware\RequireSignIn;
 use Guild\Framework\Middleware\RequireSystemAdmin;
 use Guild\Framework\Middleware\VerifyCsrfToken;
 use Guild\Framework\ServiceProvider\AuthenticationServiceProvider;
@@ -207,10 +207,10 @@ readonly class ApplicationBuilder
         $routes = require dirname(__DIR__) . '/routes/authorization.php';
         $group = $router->group('/framework/authorization', $routes);
 
-        // A guest on the OIDC path is sent to log in; under CAS, Apache must
+        // A guest on the OIDC path is sent to sign in; under CAS, Apache must
         // protect these paths, and RequireSystemAdmin explains that to a guest.
         if ($identitySource === IdentitySource::Oidc) {
-            $group->lazyMiddleware(OidcAuthenticationMiddleware::class);
+            $group->lazyMiddleware(RequireSignIn::class);
         }
 
         $group->lazyMiddleware(RequireSystemAdmin::class);

@@ -9,6 +9,7 @@ use Guild\Access\Authentication\OIDC\OidcAuthenticationService;
 use Guild\Access\Authentication\OIDC\OidcConfiguration;
 use Guild\Framework\Authentication\IuLoginSignIn;
 use Guild\Framework\Authentication\SignInMethod;
+use Guild\Framework\Middleware\RequireSignIn;
 use Guild\Framework\Session\SessionStore;
 use League\Container\ServiceProvider\AbstractServiceProvider;
 use Psr\Log\LoggerInterface;
@@ -25,6 +26,7 @@ class AuthenticationServiceProvider extends AbstractServiceProvider
             OidcAuthenticationMiddleware::class,
             OidcAuthenticationService::class,
             OidcConfiguration::class,
+            RequireSignIn::class,
             SignInMethod::class,
         ];
         return in_array($id, $services);
@@ -46,6 +48,7 @@ class AuthenticationServiceProvider extends AbstractServiceProvider
             SessionStore::class,
             LoggerInterface::class,
         ]);
+        $container->addShared(RequireSignIn::class)->addArgument(SignInMethod::class);
         $container->addShared(OidcConfiguration::class, $this->config);
     }
 }

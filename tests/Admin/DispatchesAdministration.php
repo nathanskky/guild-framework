@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Guild\Framework\Test\Admin;
 
 use Guild\Framework\Application;
+use Guild\Framework\Authentication\SignInMethod;
 use Guild\Framework\Authorization\IdentitySource;
 use Guild\Framework\Router;
 use Guild\Framework\Session\SessionStore;
@@ -23,7 +24,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\NullLogger;
 
 /**
- * Builds a CAS application with a fake Grouper and in-memory SQLite, and
+ * Builds a CAS application (or, given a SignInMethod, an OIDC one) with a fake Grouper and in-memory SQLite, and
  * dispatches one request through the real Router. The authorization
  * configuration names 'My App Admins' as the System Admin label and uses the
  * default ACM stem, iu:roles:sys:acm.
@@ -87,6 +88,7 @@ trait DispatchesAdministration
      * @param  list<ResponseInterface>  $grouper
      * @param  (callable(GrantsDatabase): void)|null  $seed
      * @param  array<string, mixed>|null  $form  a POST body; the session's CSRF token is added unless $csrf is false
+     * @param  SignInMethod|null  $signIn  builds an OIDC application whose sign-in method is this one
      * @return array{ResponseInterface, GrantsDatabase}
      */
     private function dispatch(
@@ -98,8 +100,20 @@ trait DispatchesAdministration
         bool $rivet = false,
         ?array $form = null,
         bool $csrf = true,
+        ?SignInMethod $signIn = null,
     ): array {
         $builder = Application::configure($this->basePath)->withLogger(new NullLogger())->addIlluminateDatabase();
+
+        if ($signIn !== null) {
+            file_put_contents($this->basePath . '/config/authentication.php', <<<'PHP'
+                <?php
+
+                return new Guild\Access\Authentication\OIDC\OidcConfiguration(
+                    'https://idp.login.iu.edu', 'id', 'secret', 'https://app.iu.edu/cb',
+                );
+                PHP);
+            $builder = $builder->addAuthentication();
+        }
 
         if ($rivet) {
             $builder = $builder->addTemplateEngine(TemplateEngine::Twig)->addRivet(new PageDefaults(
@@ -108,7 +122,7 @@ trait DispatchesAdministration
             ));
         }
 
-        $app = $builder->addAuthorization(IdentitySource::Cas, TestPermission::class)->create();
+        $app = $builder->addAuthorization($signIn === null ? IdentitySource::Cas : IdentitySource::Oidc, TestPermission::class)->create();
 
         $session = new ArraySessionStore();
 
@@ -128,6 +142,10 @@ trait DispatchesAdministration
         $app->addShared(GrouperClient::class, new FakeGrouper($grouper)->client);
         $app->addShared(ServerRequestInterface::class, $request, overwrite: true);
         $app->addShared(SessionStore::class, $session, overwrite: true);
+
+        if ($signIn !== null) {
+            $app->addShared(SignInMethod::class, $signIn, overwrite: true);
+        }
 
         $capsule = $app->get(Capsule::class);
         self::assertInstanceOf(Capsule::class, $capsule);

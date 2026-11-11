@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Test\Admin;
 
+use Guild\Framework\Test\Authentication\Support\FakeSignIn;
 use Guild\Grouper\Testing\FakeGrouper;
 use Guild\Framework\Test\Authorization\Support\GrantsDatabase;
 use PHPUnit\Framework\Attributes\CoversNothing;
@@ -29,6 +30,18 @@ final class AdministrationRoutesTest extends TestCase
 
         self::assertSame(403, $response->getStatusCode(), 'a guest is refused');
         self::assertStringContainsString('must be protected by CAS', (string) $response->getBody(), 'with the fix named');
+    }
+
+    public function testUnderOidcAGuestOnTheAdminPagesIsChallengedBySignInMethod(): void
+    {
+        $response = $this->dispatch('GET', '/framework/authorization', null, [], signIn: new FakeSignIn())[0];
+
+        self::assertSame(302, $response->getStatusCode(), 'a guest is sent to sign in');
+        self::assertSame(
+            '/fake-sign-in?return=%2Fframework%2Fauthorization',
+            $response->getHeaderLine('Location'),
+            'by the application\'s sign-in method',
+        );
     }
 
     public function testAnOrdinaryUserIsRefused(): void

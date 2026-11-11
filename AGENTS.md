@@ -121,7 +121,8 @@ Application::configure($basePath)
 - `addAuthentication()` requires `{basePath}/config/authentication.php`, which must return an
   `OidcConfiguration` instance specifically (checked with `instanceof`, not against an interface). It is
   handed to `AuthenticationServiceProvider`, which lazily registers `OidcConfiguration`,
-  `OidcAuthenticationService`, and `OidcAuthenticationMiddleware`.
+  `OidcAuthenticationService`, `OidcAuthenticationMiddleware`, `SignInMethod` (bound to `IuLoginSignIn`) and
+  `RequireSignIn`.
 - `addIlluminateDatabase()` requires `{basePath}/config/database.php` returning an Eloquent connection
   array. It boots a global `Illuminate\Database\Capsule\Manager` and shares it in the container.
 - `enableAutoWiring()` adds a `League\Container\ReflectionContainer` as a delegate, so
@@ -328,7 +329,7 @@ authorization on.
   routes must gate themselves.
 - **The administration pages are PHP-built Rivet documents gated on the System Admin group.** Every
   `/framework/authorization` route runs `RequireSystemAdmin` (guest or non-member → 403, membership that
-  cannot be confirmed → 503; under OIDC, `OidcAuthenticationMiddleware` first, so a guest logs in) and then
+  cannot be confirmed → 503; under OIDC, `RequireSignIn` first, so a guest is asked to sign in) and then
   `VerifyCsrfToken` (any non-GET must carry the session's `_csrf` field). `Admin\AdminPage` renders through
   the application's Rivet `Renderer` when `addRivet()` was called, else through a fallback whose navigation
   is the admin menu alone. Controllers and middleware are bound explicitly, so no autowiring is needed.
