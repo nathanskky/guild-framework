@@ -19,7 +19,7 @@ use Guild\Framework\Authorization\User;
 use Guild\Framework\Authorization\UserResolver;
 use Guild\Framework\Exception\AuthorizationUnavailableException;
 use Guild\Framework\Latte\AuthorizationExtension as LatteAuthorizationExtension;
-use Guild\Framework\Test\Authorization\Support\FakeGrouper;
+use Guild\Grouper\Testing\FakeGrouper;
 use Guild\Framework\Test\Authorization\Support\GateFactory;
 use Guild\Framework\Test\Authorization\Support\GrantsDatabase;
 use Guild\Framework\Test\Authorization\Support\Policy\Document;

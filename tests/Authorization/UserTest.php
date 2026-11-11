@@ -14,7 +14,7 @@ use Guild\Framework\Authorization\User;
 use Guild\Framework\Authorization\UserGroup;
 use Guild\Framework\Exception\AuthorizationUnavailableException;
 use Guild\Framework\Exception\ConfigurationException;
-use Guild\Framework\Test\Authorization\Support\FakeGrouper;
+use Guild\Grouper\Testing\FakeGrouper;
 use Guild\Framework\Test\Authorization\Support\GrantsDatabase;
 use Guild\Framework\Test\Authorization\Support\OtherPermission;
 use Guild\Framework\Test\Authorization\Support\TestPermission;

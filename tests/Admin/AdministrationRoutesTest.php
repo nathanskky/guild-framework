@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Test\Admin;
 
-use Guild\Framework\Test\Authorization\Support\FakeGrouper;
+use Guild\Grouper\Testing\FakeGrouper;
 use Guild\Framework\Test\Authorization\Support\GrantsDatabase;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;

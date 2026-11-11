@@ -14,6 +14,7 @@ use Guild\Framework\Authorization\Membership\Session;
 use Guild\Framework\Authorization\Policy\PolicyRegistry;
 use Guild\Framework\Authorization\UserResolver;
 use Guild\Framework\Test\Authorization\Support\Policy\DocumentPolicy;
+use Guild\Grouper\Testing\FakeGrouper;
 use League\Container\Container;
 use League\Container\ReflectionContainer;
 use Psr\Log\NullLogger;

@@ -12,7 +12,7 @@ use Guild\Framework\Authorization\Membership\MembershipProvider;
 use Guild\Framework\Authorization\Membership\Session;
 use Guild\Framework\Authorization\User;
 use Guild\Framework\Authorization\UserResolver;
-use Guild\Framework\Test\Authorization\Support\FakeGrouper;
+use Guild\Grouper\Testing\FakeGrouper;
 use Guild\Framework\Test\Authorization\Support\GrantsDatabase;
 use Guild\Framework\Test\Authorization\Support\TestPermission;
 use PHPUnit\Framework\Attributes\CoversClass;

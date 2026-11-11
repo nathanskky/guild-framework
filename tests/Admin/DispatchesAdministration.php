@@ -8,7 +8,7 @@ use Guild\Framework\Application;
 use Guild\Framework\Authorization\IdentitySource;
 use Guild\Framework\Router;
 use Guild\Framework\TemplateEngine;
-use Guild\Framework\Test\Authorization\Support\FakeGrouper;
+use Guild\Grouper\Testing\FakeGrouper;
 use Guild\Framework\Test\Authorization\Support\GrantsDatabase;
 use Guild\Framework\Test\Authorization\Support\TestPermission;
 use Guild\Grouper\GrouperClient;

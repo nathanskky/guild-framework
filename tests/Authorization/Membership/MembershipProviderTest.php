@@ -9,7 +9,7 @@ use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
 use Guild\Framework\Authorization\Membership\Session;
 use Guild\Framework\Exception\AuthorizationUnavailableException;
-use Guild\Framework\Test\Authorization\Support\FakeGrouper;
+use Guild\Grouper\Testing\FakeGrouper;
 use Guild\Grouper\Exception\GrouperConfigurationException;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
