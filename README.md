@@ -461,6 +461,13 @@ an application with the extensions they want. A `composer install --no-dev` buil
 extension that was installed with `require-dev`, and neither does `composer dump-autoload --no-dev` run over a
 development install.
 
+## Upgrading to 2.1.3
+
+Nothing needs action. A signed-in visitor whose request throws `AuthenticationRequiredException` gets the
+403 "Not authorized" page instead of the sign-in method's challenge, because signing in again cannot help
+them. `Gate` throws that exception only for a guest, so this changes nothing unless application code throws
+it itself. A custom `SignInMethod::challenge()` is only ever called for a guest.
+
 ## Upgrading to 2.1.2
 
 Nothing needs action. 2.1.2 fixes 2.1.1, where a request no route answers failed with a `TypeError` in an
