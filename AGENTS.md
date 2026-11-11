@@ -12,7 +12,7 @@ standalone**.
 - **PHP:** `~8.5.0`
 - **Remote:** `git@github.com:nathanskky/guild-framework.git` (SSH), or
   `https://github.com/nathanskky/guild-framework.git` if you don't have SSH keys set up
-- **Current release:** `2.1.0`
+- **Current release:** `2.1.1`
 - **Default branch:** `develop`. **Work targets `develop`** — see
   [Branching and pull requests](#branching-and-pull-requests).
 - **`composer.lock` is gitignored** here, so there is no lock to keep in sync.
@@ -216,6 +216,10 @@ Application::configure($basePath)
   not a denial type: it is a 503, not a 403. `Middleware\AuthorizationFailureResponder`, which
   `addAuthorization()` installs at router level, answers all three: a 403, a sign-in challenge under OIDC
   (a 403 "Sign in required" under CAS), and a 503.
+- **A request no route answers is a status page, not an exception.** `Routing\StatusPageStrategy`, the
+  router's strategy, answers it with `Authorization\StatusPage`: 404, or 405 with `Allow`. League puts its
+  not-found and method-not-allowed decorators in front of router-level middleware, so the strategy's
+  decorator appends the page to the end of the chain and lets the request run through that middleware.
   **`addRouting()` does not do this** — it is not wrapped in a try/catch, so a missing or broken
   `routes/routes.php` surfaces as a raw `require` failure. And if the file loads but returns something that
   is not callable, the `is_callable()` guard means **no routes are registered and no error is raised** —

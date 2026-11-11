@@ -18,7 +18,6 @@ use Guild\Framework\Session\SessionStore;
 use Guild\Framework\Test\Authentication\Support\FakeSignIn;
 use Guild\Framework\Testing\ArraySessionStore;
 use Laminas\Diactoros\ServerRequest;
-use League\Route\Http\Exception\MethodNotAllowedException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
@@ -104,11 +103,15 @@ final class SignOutTest extends TestCase
         self::assertSame(0, $signIn->signOuts, 'and nobody is signed out');
     }
 
-    public function testGetIsNotARoute(): void
+    public function testGetIsNotAllowed(): void
     {
-        $this->expectException(MethodNotAllowedException::class);
+        $signIn = new FakeSignIn();
 
-        $this->dispatch('GET', null, new FakeSignIn());
+        $response = $this->dispatch('GET', null, $signIn);
+
+        self::assertSame(405, $response->getStatusCode(), 'a link cannot sign anyone out');
+        self::assertSame('POST', $response->getHeaderLine('Allow'), 'only a form can');
+        self::assertSame(0, $signIn->signOuts, 'and nobody is signed out');
     }
 
     /**

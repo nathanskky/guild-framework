@@ -7,6 +7,7 @@ namespace Guild\Framework;
 use Guild\Framework\Extension\ApplicationExtension;
 use Guild\Framework\Extension\ClaimedSlots;
 use Guild\Framework\Extension\ExtensionDiscovery;
+use Guild\Framework\Routing\StatusPageStrategy;
 use Guild\Framework\ServiceProvider\FrameworkPageServiceProvider;
 use Guild\Framework\Session\NativeSessionStore;
 use Guild\Framework\Session\SessionStore;
@@ -14,7 +15,6 @@ use Laminas\Diactoros\ServerRequestFactory;
 use Laminas\HttpHandlerRunner\Emitter\SapiEmitter;
 use League\Container\Argument\Literal\StringArgument;
 use League\Container\Container;
-use League\Route\Strategy\ApplicationStrategy;
 use Monolog\Handler\ErrorLogHandler;
 use Monolog\Logger;
 use Monolog\Processor\PsrLogMessageProcessor;
@@ -145,7 +145,7 @@ final class Application extends Container
     {
         $this->addShared(ServerRequestInterface::class, [ServerRequestFactory::class, 'fromGlobals']);
         $this->addShared(Router::class, function () {
-            $strategy = new ApplicationStrategy();
+            $strategy = new StatusPageStrategy();
             $strategy->setContainer($this);
             return new Router()->setStrategy($strategy);
         });

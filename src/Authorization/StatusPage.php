@@ -12,7 +12,8 @@ use Laminas\Diactoros\Response\HtmlResponse;
 use Psr\Http\Message\ResponseInterface;
 
 /**
- * A short page that tells a visitor why a request was refused.
+ * A short page that tells a visitor why a request was not answered: no such
+ * page, the wrong method, or an authorization failure.
  *
  * With addRivet() it is an rvt_page document in the application's layout;
  * without it, a plain HTML5 document.

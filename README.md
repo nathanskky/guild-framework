@@ -103,6 +103,11 @@ return static function (Router $router): void {
 };
 ```
 
+A request no route answers gets a short status page: 404 for an address with no page, and 405, with an
+`Allow` header, for a page asked with a method it doesn't take. The page uses the application's Rivet
+layout after `addRivet()`, and is a plain HTML document otherwise. Router-level middleware wraps it as it
+wraps any page.
+
 If the file returns something that is not callable, no routes are registered and no error is raised.
 `/framework` is reserved for the framework's own pages.
 
@@ -453,6 +458,11 @@ by its Grouper name answer 503; editing, mapping and unregistering groups still 
 an application with the extensions they want. A `composer install --no-dev` build never discovers an
 extension that was installed with `require-dev`, and neither does `composer dump-autoload --no-dev` run over a
 development install.
+
+## Upgrading to 2.1.1
+
+A request no route answers is a 404 or 405 page instead of an uncaught `League\Route\Http\Exception\NotFoundException`
+or `MethodNotAllowedException`. Code that caught those exceptions around `Router::dispatch()` no longer sees them.
 
 ## Upgrading to 2.1
 
