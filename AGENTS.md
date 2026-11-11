@@ -291,8 +291,8 @@ patterns below are *observed*, not a style guide, and cover only what Pint doesn
 - Directory names under `src/` are **singular**: `Controller`, `Model`, `Exception`, `ServiceProvider`,
   `Middleware`.
 - **Classes that are not public API carry `@internal`** — the admin pages' helpers (`Admin/`), the
-  controllers and middleware (`Middleware\RequireSignIn` is the public exception: applications add it to
-  their routes), `StatusPage`, `PolicyRegistry`, the membership cache and provider, `GrantRepository`,
+  controllers and middleware (`Middleware\RequireSignIn` and `Middleware\VerifyCsrfToken` are the public
+  exceptions: applications and extensions add them to their routes, and `Admin\Csrf` is public with them), `StatusPage`, `PolicyRegistry`, the membership cache and provider, `GrantRepository`,
   `AdminNavigation`, `ContainerNavigation`, `TemplateAuthorization`, `Extension\ExtensionDiscovery`, the Twig and
   Latte `AuthenticationExtension` classes, `AuthenticationServiceProvider` and
   `AuthorizationServiceProvider` (only `ApplicationBuilder` constructs them), and `User`'s constructor. Keep that

@@ -75,6 +75,15 @@ final class SignOutTest extends TestCase
         self::assertSame(1, $signIn->signOuts, 'after the sign-in method signed them out');
     }
 
+    public function testSigningOutRotatesTheCsrfToken(): void
+    {
+        $session = new ArraySessionStore(['guild_framework_csrf' => 't']);
+
+        $this->dispatch('POST', ['_csrf' => 't'], new FakeSignIn(), $session);
+
+        self::assertNotSame('t', $session->get('guild_framework_csrf'), 'a token known before signing out is worthless after');
+    }
+
     public function testAMissingTokenIsRefused(): void
     {
         $signIn = new FakeSignIn();
@@ -105,7 +114,7 @@ final class SignOutTest extends TestCase
     /**
      * @param  array<string, string>|null  $form
      */
-    private function dispatch(string $method, ?array $form, SignInMethod $signIn): ResponseInterface
+    private function dispatch(string $method, ?array $form, SignInMethod $signIn, ?ArraySessionStore $session = null): ResponseInterface
     {
         $app = Application::configure($this->basePath)->withLogger(new NullLogger())->addAuthentication()->create();
 
@@ -113,7 +122,7 @@ final class SignOutTest extends TestCase
 
         // Registered before anything resolves them, so these win.
         $app->addShared(ServerRequestInterface::class, $request, overwrite: true);
-        $app->addShared(SessionStore::class, new ArraySessionStore(['guild_framework_csrf' => 't']), overwrite: true);
+        $app->addShared(SessionStore::class, $session ?? new ArraySessionStore(['guild_framework_csrf' => 't']), overwrite: true);
         $app->addShared(SignInMethod::class, $signIn, overwrite: true);
 
         $router = $app->get(Router::class);

@@ -9,6 +9,7 @@ use Guild\Access\Authentication\OIDC\OidcAuthenticationService;
 use Guild\Access\Authentication\OIDC\OidcConfiguration;
 use Guild\Framework\Authentication\IuLoginSignIn;
 use Guild\Framework\Authentication\SignInMethod;
+use Guild\Framework\Admin\Csrf;
 use Guild\Framework\Controller\Authentication\SignOutController;
 use Guild\Framework\Extension\SlotClaim;
 use Guild\Framework\Middleware\RequireSignIn;
@@ -61,7 +62,7 @@ class AuthenticationServiceProvider extends AbstractServiceProvider
         }
 
         $container->addShared(RequireSignIn::class)->addArgument(SignInMethod::class);
-        $container->addShared(SignOutController::class)->addArgument(SignInMethod::class);
+        $container->addShared(SignOutController::class)->addArguments([SignInMethod::class, Csrf::class]);
     }
 
     private function registerIuLogin(OidcConfiguration $config): void

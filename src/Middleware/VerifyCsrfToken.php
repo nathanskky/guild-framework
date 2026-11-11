@@ -14,9 +14,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 
 /**
  * Rejects any state-changing request whose form did not carry this session's
- * CSRF token.
- *
- * @internal
+ * CSRF token (Csrf::field()). API: extensions put it on their own form routes.
  */
 final readonly class VerifyCsrfToken implements MiddlewareInterface
 {

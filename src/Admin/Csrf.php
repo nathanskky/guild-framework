@@ -14,7 +14,8 @@ use Guild\Rivet\Html\Html;
  * form posts; the token is the second layer, for pages that change who may do
  * what.
  *
- * @internal
+ * API for extensions' own forms: render field() in the form and put
+ * VerifyCsrfToken on the route. Call rotate() when the signed-in user changes.
  */
 final readonly class Csrf
 {
@@ -36,6 +37,15 @@ final readonly class Csrf
         }
 
         return $token;
+    }
+
+    /**
+     * Forget the token, so the next form gets a new one and every form issued
+     * before no longer validates.
+     */
+    public function rotate(): void
+    {
+        $this->session->forget(self::KEY);
     }
 
     public function field(): Html

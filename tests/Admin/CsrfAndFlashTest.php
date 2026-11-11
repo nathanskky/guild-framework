@@ -51,6 +51,17 @@ final class CsrfAndFlashTest extends TestCase
         );
     }
 
+    public function testRotatingIssuesANewToken(): void
+    {
+        $csrf = new Csrf(new ArraySessionStore());
+        $before = $csrf->token();
+
+        $csrf->rotate();
+
+        self::assertNotSame($before, $csrf->token(), 'the next form gets a new token');
+        self::assertFalse($csrf->isValid($before), 'and a form issued before the rotation no longer validates');
+    }
+
     public function testSafeMethodsPassWithoutAToken(): void
     {
         $response = $this->middleware()->process(new ServerRequest(method: 'GET'), $this->handler());

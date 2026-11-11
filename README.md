@@ -163,6 +163,11 @@ a form that carries the session's CSRF token, so a link or a `GET` cannot sign a
 With IU Login, the visitor lands on IU Login's logout page, or on `defaultReturnUrl` when there was no
 IU Login session. A sign-in method chosen by an extension decides for itself.
 
+Signing out also replaces the session's CSRF token, so a form issued while signed in is refused afterwards.
+An extension's own forms use the same token: render `Guild\Framework\Admin\Csrf::field()` in the form, put
+`Guild\Framework\Middleware\VerifyCsrfToken` on the route, and call `Csrf::rotate()` when the signed-in user
+changes.
+
 ### `addTemplateEngine()`
 
 Takes `TemplateEngine::Twig` or `TemplateEngine::Latte` and binds `Guild\Framework\View`, which loads
