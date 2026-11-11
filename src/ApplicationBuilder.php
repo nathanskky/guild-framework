@@ -99,6 +99,15 @@ readonly class ApplicationBuilder
         return $this;
     }
 
+    /**
+     * The application's path for $resource ('base' or 'config'), so an
+     * extension's configure() can find files beside the application's own.
+     */
+    public function path(string $resource): ?string
+    {
+        return $this->app->getPath($resource);
+    }
+
     public function addRouting(): self
     {
         $routesFilePath = $this->app->getPath('base') . '/routes/routes.php';
@@ -119,6 +128,7 @@ readonly class ApplicationBuilder
      */
     public function addAuthentication(): self
     {
+        $this->app->claimedSlots->markSignInMethodRead('addAuthentication()');
         $claim = $this->app->claimedSlots->signInMethod;
 
         if ($claim !== null) {
@@ -219,6 +229,9 @@ readonly class ApplicationBuilder
         array $policies = [],
         ?AdminMenu $adminMenu = new AdminMenu(),
     ): self {
+        $this->app->claimedSlots->markSignInMethodRead('addAuthorization()');
+        $this->app->claimedSlots->markGroupDirectoryRead('addAuthorization()');
+        $this->app->claimedSlots->markSystemAdminGroupRead('addAuthorization()');
         $signInClaim = $this->app->claimedSlots->signInMethod;
 
         // Checked before any config file is read: the claim would otherwise be silently
@@ -328,7 +341,8 @@ readonly class ApplicationBuilder
         return $config->systemAdminGroup ?? throw new ConfigurationException(
             'config/authorization.php gives no System Admin group label. Pass systemAdminGroup: the ACM label '
             . 'of the group whose members administer this application (starter reads it from '
-            . 'AUTHORIZATION_SYSTEM_ADMIN_GROUP).'
+            . 'AUTHORIZATION_SYSTEM_ADMIN_GROUP). An installed extension can supply it instead (guild/dev-tools '
+            . 'reads it from systemAdminGroup: in config/personas.php).'
         );
     }
 
@@ -503,8 +517,10 @@ readonly class ApplicationBuilder
     /**
      * Get the application instance.
      *
-     * The first call logs a notice for each slot an extension took over, then
-     * boots each extension. Later calls only return the application.
+     * The first call logs a notice for each slot an extension took over and
+     * each choice nothing used, boots each extension, then checks that the
+     * container can build every chosen class that is used. Later calls only
+     * return the application.
      *
      * @return Application
      */
@@ -514,9 +530,9 @@ readonly class ApplicationBuilder
             return $this->app;
         }
 
-        $takeovers = $this->app->claimedSlots->takeovers();
+        $notices = [...$this->app->claimedSlots->takeovers(), ...$this->app->claimedSlots->unusedClaims()];
 
-        if ($takeovers !== []) {
+        if ($notices !== []) {
             $logger = $this->app->get(LoggerInterface::class);
 
             if (! $logger instanceof LoggerInterface) {
@@ -525,13 +541,21 @@ readonly class ApplicationBuilder
                 );
             }
 
-            foreach ($takeovers as $takeover) {
-                $logger->notice($takeover);
+            foreach ($notices as $notice) {
+                $logger->notice($notice);
             }
         }
 
         foreach ($this->extensions as $extension) {
             $extension->boot($this->app);
+        }
+
+        // has(), not get(): building the class here would capture services such as the
+        // SessionStore before a test can override them.
+        $unbuildable = $this->app->claimedSlots->unbuildableClaims(fn (string $class): bool => $this->app->has($class));
+
+        if ($unbuildable !== []) {
+            throw new ConfigurationException($unbuildable[0]);
         }
 
         return $this->app;

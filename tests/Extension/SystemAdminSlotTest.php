@@ -133,7 +133,9 @@ final class SystemAdminSlotTest extends TestCase
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage(
             'config/authorization.php gives no System Admin group label. Pass systemAdminGroup: the ACM label of the group '
-            . 'whose members administer this application (starter reads it from AUTHORIZATION_SYSTEM_ADMIN_GROUP).'
+            . 'whose members administer this application (starter reads it from AUTHORIZATION_SYSTEM_ADMIN_GROUP). '
+            . 'An installed extension can supply it instead (guild/dev-tools reads it from systemAdminGroup: in '
+            . 'config/personas.php).'
         );
 
         $builder->addAuthorization(IdentitySource::Cas, TestPermission::class);
@@ -150,6 +152,22 @@ final class SystemAdminSlotTest extends TestCase
             )),
             "useSystemAdminGroup(' Starter Admins ') makes members of 'Starter Admins' System Admins",
         );
+    }
+
+    public function testALabelChosenAfterAddAuthorizationIsRejected(): void
+    {
+        $this->writeAuthorizationConfig("new Guild\\Framework\\Authorization\\AuthorizationConfiguration('My App Admins')");
+        $builder = Application::configure($this->basePath, [new ClaimingExtension(directory: new ArrayGroupDirectory())])
+            ->withLogger(new NullLogger())
+            ->addIlluminateDatabase()
+            ->addAuthorization(IdentitySource::Cas, TestPermission::class);
+
+        $this->expectException(ConfigurationException::class);
+        $this->expectExceptionMessage(
+            'The System Admin group was chosen by the application after addAuthorization() had already run without it.'
+        );
+
+        $builder->useSystemAdminGroup('Starter Admins');
     }
 
     private function writeAuthorizationConfig(string $expression): void

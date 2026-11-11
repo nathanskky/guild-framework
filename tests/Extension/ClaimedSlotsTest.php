@@ -17,6 +17,7 @@ use Guild\Framework\Test\Extension\Support\UnusedGroupDirectory;
 use Monolog\Handler\TestHandler;
 use Monolog\Level;
 use Monolog\Logger;
+use Psr\Log\NullLogger;
 use RuntimeException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -67,6 +68,7 @@ final class ClaimedSlotsTest extends TestCase
         });
 
         $app = Application::configure(sys_get_temp_dir(), [$extension])
+            ->withLogger(new NullLogger())
             ->useGroupDirectory(UnusedGroupDirectory::class)
             ->create();
 
@@ -196,5 +198,66 @@ final class ClaimedSlotsTest extends TestCase
             $log->hasRecord('Acme\Extension chose the sign-in method.', Level::Notice),
             'the takeover is logged at notice',
         );
+    }
+
+    public function testAClaimAfterItsSlotWasReadIsRejected(): void
+    {
+        $slots = new ClaimedSlots();
+        $slots->markSignInMethodRead('addAuthentication()');
+
+        $this->expectException(ConfigurationException::class);
+        $this->expectExceptionMessage(
+            'The sign-in method was chosen by Acme\LateExtension after addAuthentication() had already run without it. '
+            . "Choose it before that call; an extension's configure() runs before the application's own calls."
+        );
+
+        $slots->during('Acme\LateExtension', static fn () => $slots->claimSignInMethod(FakeSignIn::class));
+    }
+
+    public function testAnUnusedClaimIsLoggedAtCreate(): void
+    {
+        $extension = new RecordingExtension(static function (ApplicationBuilder $builder): void {
+            $builder->useGroupDirectory(UnusedGroupDirectory::class);
+        });
+        $log = new TestHandler();
+
+        Application::configure(sys_get_temp_dir(), [$extension])
+            ->withLogger(new Logger('test', [$log]))
+            ->create();
+
+        self::assertTrue(
+            $log->hasRecord(
+                'Group directory ' . UnusedGroupDirectory::class . ' was chosen by ' . RecordingExtension::class
+                . ', but addAuthorization() was not called, so it is not used.',
+                Level::Notice,
+            ),
+            'an application that never adds authorization still boots, and says the choice went unused',
+        );
+    }
+
+    public function testAClaimedClassTheContainerCannotBuildFailsAtCreate(): void
+    {
+        $extension = new RecordingExtension(static function (ApplicationBuilder $builder): void {
+            $builder->useSignInMethod(FakeSignIn::class);
+        });
+        $builder = Application::configure(sys_get_temp_dir(), [$extension])
+            ->withLogger(new NullLogger())
+            ->addAuthentication();
+
+        $this->expectException(ConfigurationException::class);
+        $this->expectExceptionMessage(
+            'Sign-in method ' . FakeSignIn::class . ' was chosen by ' . RecordingExtension::class
+            . ', but the container cannot build it. Bind it in ' . RecordingExtension::class
+            . '::boot(), or call enableAutoWiring().'
+        );
+
+        $builder->create();
+    }
+
+    public function testTheBuilderGivesExtensionsTheConfigPath(): void
+    {
+        $builder = Application::configure('/srv/app', []);
+
+        self::assertSame('/srv/app/config', $builder->path('config'), 'an extension finds its own config file beside the application\'s');
     }
 }

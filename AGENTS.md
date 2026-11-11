@@ -229,8 +229,12 @@ Application::configure($basePath)
 returning the builder, it calls each extension's `configure($builder)`, in package name order. An extension
 may choose a slot with `useSignInMethod()`, `useGroupDirectory()` or `useSystemAdminGroup()`; the `@internal`
 `Extension\ClaimedSlots`, held on `Application`, records each choice and who made it, and a second choice of
-the same slot throws `ConfigurationException` naming both. `create()` logs each takeover notice at `notice`,
-then calls each extension's `boot($app)`; both happen on the first `create()` only. A `--no-dev` install
+the same slot throws `ConfigurationException` naming both, and so does a choice made after the `add*()` call
+that reads the slot. `create()` logs each takeover notice, and each choice nothing read, at `notice`, then calls
+each extension's `boot($app)`, then throws if the container `has()` no binding for a chosen class that is used;
+it checks with `has()` rather than `get()` so nothing is built before tests override services. All of this
+happens on the first `create()` only. `ApplicationBuilder::path()` lets an extension's `configure()` find
+`config/`. A `--no-dev` install
 leaves out dev packages, so an extension required with `require-dev` never runs in production.
 
 ### Request lifecycle

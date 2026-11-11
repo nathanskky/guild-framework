@@ -435,6 +435,12 @@ An extension that chose the sign-in method still needs `addAuthentication()`, fo
 once, so two extensions choosing the same one fail at boot with a message naming both. Every choice that takes
 effect is logged at `notice`.
 
+Choose in `configure()`: a choice made after the `add*()` call that reads the slot is refused. A choice that
+nothing reads, such as a group directory in an application that never calls `addAuthorization()`, is logged at
+`notice` and otherwise ignored. A chosen class must be buildable by the container: bind it in the extension's
+`boot()`, or rely on `enableAutoWiring()`; `create()` fails otherwise. `$builder->path('config')` gives the
+application's config directory, for an extension that reads a file of its own there.
+
 With a chosen group directory there is no Grouper connection, so the three actions that register a group
 by its Grouper name answer 503; editing, mapping and unregistering groups still work.
 
