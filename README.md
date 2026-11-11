@@ -459,6 +459,11 @@ an application with the extensions they want. A `composer install --no-dev` buil
 extension that was installed with `require-dev`, and neither does `composer dump-autoload --no-dev` run over a
 development install.
 
+## Upgrading to 2.1.2
+
+Nothing needs action. 2.1.2 fixes 2.1.1, where a request no route answers failed with a `TypeError` in an
+application with router middleware registered by class name.
+
 ## Upgrading to 2.1.1
 
 A request no route answers is a 404 or 405 page instead of an uncaught `League\Route\Http\Exception\NotFoundException`

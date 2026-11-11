@@ -33,7 +33,8 @@ final class MissingPageTest extends TestCase
 
             return static function (Guild\Framework\Router $router): void {
                 $router->map('GET', '/documents', static fn (): Psr\Http\Message\ResponseInterface => new Laminas\Diactoros\Response\TextResponse('documents'));
-                $router->middleware(new Guild\Framework\Test\Routing\Support\MarksResponses());
+                // By class name, as applications and the framework register router middleware.
+                $router->lazyMiddleware(Guild\Framework\Test\Routing\Support\MarksResponses::class);
             };
             PHP);
     }
@@ -79,7 +80,7 @@ final class MissingPageTest extends TestCase
 
     private function send(string $method, string $path): ResponseInterface
     {
-        $app = Application::configure($this->basePath)->addRouting()->create();
+        $app = Application::configure($this->basePath)->enableAutoWiring()->addRouting()->create();
         $router = $app->get(Router::class);
         self::assertInstanceOf(Router::class, $router);
 

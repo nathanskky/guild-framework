@@ -12,7 +12,7 @@ standalone**.
 - **PHP:** `~8.5.0`
 - **Remote:** `git@github.com:nathanskky/guild-framework.git` (SSH), or
   `https://github.com/nathanskky/guild-framework.git` if you don't have SSH keys set up
-- **Current release:** `2.1.1`
+- **Current release:** `2.1.2`
 - **Default branch:** `develop`. **Work targets `develop`** — see
   [Branching and pull requests](#branching-and-pull-requests).
 - **`composer.lock` is gitignored** here, so there is no lock to keep in sync.
@@ -216,15 +216,16 @@ Application::configure($basePath)
   not a denial type: it is a 503, not a 403. `Middleware\AuthorizationFailureResponder`, which
   `addAuthorization()` installs at router level, answers all three: a 403, a sign-in challenge under OIDC
   (a 403 "Sign in required" under CAS), and a 503.
-- **A request no route answers is a status page, not an exception.** `Routing\StatusPageStrategy`, the
-  router's strategy, answers it with `Authorization\StatusPage`: 404, or 405 with `Allow`. League puts its
-  not-found and method-not-allowed decorators in front of router-level middleware, so the strategy's
-  decorator appends the page to the end of the chain and lets the request run through that middleware.
   **`addRouting()` does not do this** — it is not wrapped in a try/catch, so a missing or broken
   `routes/routes.php` surfaces as a raw `require` failure. And if the file loads but returns something that
   is not callable, the `is_callable()` guard means **no routes are registered and no error is raised** —
   every request 404s with nothing to explain why. If you are adding a config-driven `add*` method, follow
   the wrapping pattern of the other three rather than `addRouting()`.
+- **A request no route answers is a status page, not an exception.** `Routing\StatusPageStrategy`, the
+  router's strategy, answers it with `Authorization\StatusPage`: 404, or 405 with `Allow`. League puts its
+  not-found and method-not-allowed decorators in front of router-level middleware and, on that path, leaves
+  middleware registered by class name unresolved; `Routing\StatusPageResponder` resolves the rest of the
+  stack from the container and runs it, with the status page at the end.
 
 **Extensions run before the application's own calls.**
 `Application::configure($basePath, ?array $extensions = null)` takes a list of
@@ -330,10 +331,9 @@ that file:
 | `addAuthorization()` | `config/authorization.php`, and `config/grouper.php` unless an installed extension chose the group directory — plus arguments for the code-level facts; with OIDC, requires `addAuthentication()` first |
 | `enableAutoWiring()` | none |
 
-`guild/starter` is the worked example: it does not call `addAuthentication()`, and its
-`addAuthorization()` call is committed commented out, so none of `config/authentication.php`,
-`config/authorization.php` and `config/grouper.php` is loaded and the app runs without them. Its `AGENTS.md`
-lists the steps to turn authorization on.
+`guild/starter` is the worked example: it calls `addAuthentication()` and `addAuthorization()`, and
+with guild/dev-tools' persona sign-in on locally, neither `config/authentication.php` nor
+`config/grouper.php` is loaded. Its `AGENTS.md` says how to turn authorization off.
 
 ## Landmines
 
