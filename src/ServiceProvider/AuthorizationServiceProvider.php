@@ -20,6 +20,8 @@ use Guild\Framework\Authorization\Identity\IdentityReader;
 use Guild\Framework\Authorization\Identity\OidcIdentityReader;
 use Guild\Framework\Authorization\Identity\RemoteUserIdentityReader;
 use Guild\Framework\Authorization\IdentitySource;
+use Guild\Framework\Authorization\Membership\GroupDirectory;
+use Guild\Framework\Authorization\Membership\GrouperGroupDirectory;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
 use Guild\Framework\Authorization\Permission;
@@ -80,6 +82,7 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
             MembershipCache::class,
             GrantRepository::class,
             GrouperClient::class,
+            GroupDirectory::class,
             AuthorizationConfiguration::class,
         ];
 
@@ -114,16 +117,23 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
 
         $container->addShared(MembershipCache::class, static fn (): MembershipCache => new MembershipCache($session()));
 
-        $container->addShared(MembershipProvider::class, static function () use ($container, $config): MembershipProvider {
+        $container->addShared(GroupDirectory::class, static function () use ($container): GroupDirectory {
             /** @var GrouperClient $grouper */
             $grouper = $container->get(GrouperClient::class);
+
+            return new GrouperGroupDirectory($grouper);
+        });
+
+        $container->addShared(MembershipProvider::class, static function () use ($container, $config): MembershipProvider {
+            /** @var GroupDirectory $directory */
+            $directory = $container->get(GroupDirectory::class);
             /** @var MembershipCache $cache */
             $cache = $container->get(MembershipCache::class);
             /** @var LoggerInterface $logger */
             $logger = $container->get(LoggerInterface::class);
 
             return new MembershipProvider(
-                $grouper,
+                $directory,
                 $cache,
                 $logger,
                 $config->membershipTtl,

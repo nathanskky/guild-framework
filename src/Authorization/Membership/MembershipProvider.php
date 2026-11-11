@@ -6,23 +6,22 @@ namespace Guild\Framework\Authorization\Membership;
 
 use Closure;
 use Guild\Framework\Exception\AuthorizationUnavailableException;
-use Guild\Grouper\GrouperClient;
 use Guild\Grouper\GroupMembership;
 use Psr\Log\LoggerInterface;
 
 /**
  * Answers "which Grouper groups is this user in", with a session cache in
- * front of Grouper and bounded staleness when Grouper is unreachable.
+ * front of the group directory and bounded staleness when it is unreachable.
  *
- * - A cache entry younger than the TTL is used without calling Grouper.
- * - Otherwise Grouper is asked, and a successful answer (including an empty
- *   one) replaces the cache entry.
- * - If Grouper is unreachable, an entry younger than TTL + stale cap is
+ * - A cache entry younger than the TTL is used without asking the directory.
+ * - Otherwise the directory is asked, and a successful answer (including an
+ *   empty one) replaces the cache entry.
+ * - If the directory is unreachable, an entry younger than TTL + stale cap is
  *   served as stale, with a warning logged every time.
  * - Past that, or with no entry, the answer is unavailable and this throws.
  *
- * Grouper errors that a person must fix (rejected credentials, malformed
- * responses) are not caught; they propagate from guild/grouper as thrown.
+ * Errors that a person must fix (rejected Grouper credentials, malformed
+ * responses) are not caught; they propagate from the directory as thrown.
  *
  * @internal
  */
@@ -35,7 +34,7 @@ final readonly class MembershipProvider
      * @param  Closure(): int  $clock  Returns the current Unix time.
      */
     public function __construct(
-        private GrouperClient $grouper,
+        private GroupDirectory $directory,
         private MembershipCache $cache,
         private LoggerInterface $logger,
         private int $ttl,
@@ -56,7 +55,7 @@ final readonly class MembershipProvider
             return new Membership($cached['groups'], true, $cached['fetchedAt']);
         }
 
-        $result = $this->grouper->groupsFor($username);
+        $result = $this->directory->groupsFor($username);
 
         if ($result instanceof GroupMembership) {
             $this->cache->put($username, $result->groups, $now);

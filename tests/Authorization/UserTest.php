@@ -8,6 +8,7 @@ use Guild\Framework\Testing\ArraySessionStore;
 use Guild\Framework\Authorization\GrantRepository;
 use Guild\Framework\Authorization\Identity\Identity;
 use Guild\Framework\Authorization\Membership\Membership;
+use Guild\Framework\Authorization\Membership\GrouperGroupDirectory;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
 use Guild\Framework\Authorization\User;
@@ -34,6 +35,7 @@ use Psr\Log\NullLogger;
 #[UsesClass(Membership::class)]
 #[UsesClass(MembershipCache::class)]
 #[UsesClass(MembershipProvider::class)]
+#[UsesClass(GrouperGroupDirectory::class)]
 #[UsesClass(ArraySessionStore::class)]
 final class UserTest extends TestCase
 {
@@ -178,7 +180,7 @@ final class UserTest extends TestCase
     {
         return new User(
             new Identity($username, $attributes),
-            new MembershipProvider($grouper->client, $this->cache(), new NullLogger(), self::TTL, 3600, static fn (): int => self::NOW),
+            new MembershipProvider(new GrouperGroupDirectory($grouper->client), $this->cache(), new NullLogger(), self::TTL, 3600, static fn (): int => self::NOW),
             new GrantRepository($this->db->connection),
             TestPermission::class,
             'My App Admins',

@@ -9,6 +9,7 @@ use Guild\Framework\Authorization\Gate;
 use Guild\Framework\Authorization\GrantRepository;
 use Guild\Framework\Authorization\Identity\Identity;
 use Guild\Framework\Authorization\Identity\IdentityReader;
+use Guild\Framework\Authorization\Membership\GrouperGroupDirectory;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
 use Guild\Framework\Authorization\Policy\PolicyRegistry;
@@ -53,7 +54,7 @@ final class GateFactory
         return new UserResolver(
             $reader,
             new MembershipProvider(
-                $grouper->client,
+                new GrouperGroupDirectory($grouper->client),
                 new MembershipCache(new ArraySessionStore()),
                 new NullLogger(),
                 900,

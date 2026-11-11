@@ -12,6 +12,7 @@ use Guild\Framework\Authorization\HandlesResource;
 use Guild\Framework\Authorization\Identity\Identity;
 use Guild\Framework\Authorization\Identity\IdentityReader;
 use Guild\Framework\Authorization\Membership\Membership;
+use Guild\Framework\Authorization\Membership\GrouperGroupDirectory;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
 use Guild\Framework\Authorization\Policy\PolicyMethod;
@@ -53,6 +54,7 @@ use Psr\Log\NullLogger;
 #[UsesClass(Membership::class)]
 #[UsesClass(MembershipCache::class)]
 #[UsesClass(MembershipProvider::class)]
+#[UsesClass(GrouperGroupDirectory::class)]
 #[UsesClass(ArraySessionStore::class)]
 final class GateTest extends TestCase
 {
@@ -206,7 +208,7 @@ final class GateTest extends TestCase
         return new Gate(
             new UserResolver(
                 $reader,
-                new MembershipProvider($grouper->client, $this->cache(), new NullLogger(), self::TTL, 3600, static fn (): int => self::NOW),
+                new MembershipProvider(new GrouperGroupDirectory($grouper->client), $this->cache(), new NullLogger(), self::TTL, 3600, static fn (): int => self::NOW),
                 new GrantRepository($this->db->connection),
                 TestPermission::class,
                 'My App Admins',

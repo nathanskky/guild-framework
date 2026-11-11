@@ -6,6 +6,7 @@ namespace Guild\Framework\Test\Authorization\Membership;
 
 use Guild\Framework\Testing\ArraySessionStore;
 use Guild\Framework\Authorization\Membership\Membership;
+use Guild\Framework\Authorization\Membership\GrouperGroupDirectory;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
 use Guild\Framework\Exception\AuthorizationUnavailableException;
@@ -22,6 +23,7 @@ use PHPUnit\Framework\TestCase;
  * TTL 900 s and stale cap 3600 s throughout, with the clock under test control.
  */
 #[CoversClass(MembershipProvider::class)]
+#[UsesClass(GrouperGroupDirectory::class)]
 #[UsesClass(Membership::class)]
 #[UsesClass(MembershipCache::class)]
 #[UsesClass(ArraySessionStore::class)]
@@ -153,7 +155,7 @@ final class MembershipProviderTest extends TestCase
     private function provider(FakeGrouper $grouper, int $staleCap = self::STALE_CAP): MembershipProvider
     {
         return new MembershipProvider(
-            $grouper->client,
+            new GrouperGroupDirectory($grouper->client),
             $this->cache,
             new Logger('test', [$this->log], [new PsrLogMessageProcessor()]),
             self::TTL,
