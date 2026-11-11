@@ -27,7 +27,9 @@ use Psr\Http\Message\ServerRequestInterface;
  *
  * Groups themselves are managed in ACM, never here. Registering one records
  * its identifier, resolved from the ACM label an administrator types, so the
- * thing verified and the thing matched are always the same.
+ * thing verified and the thing matched are always the same. Without a Grouper
+ * connection (an extension chose the group directory) registering is not
+ * possible, and says so; editing, mapping and unregistering still work.
  *
  * @internal
  */
@@ -40,7 +42,7 @@ final readonly class GroupController
         private Flash $flash,
         private Csrf $csrf,
         private Actor $actor,
-        private GrouperClient $grouper,
+        private ?GrouperClient $grouper,
     ) {
     }
 
@@ -66,6 +68,10 @@ final readonly class GroupController
 
     public function registerForm(ServerRequestInterface $request): ResponseInterface
     {
+        if ($this->grouper === null) {
+            return $this->noGrouper();
+        }
+
         return $this->registration();
     }
 
@@ -76,6 +82,10 @@ final readonly class GroupController
      */
     public function register(ServerRequestInterface $request): ResponseInterface
     {
+        if ($this->grouper === null) {
+            return $this->noGrouper();
+        }
+
         $label = FormInput::from($request)->string('label');
 
         if ($label === '') {
@@ -106,6 +116,10 @@ final readonly class GroupController
      */
     public function choose(ServerRequestInterface $request): ResponseInterface
     {
+        if ($this->grouper === null) {
+            return $this->noGrouper();
+        }
+
         $input = FormInput::from($request);
         $label = $input->string('label');
         $identifier = $input->string('identifier');
@@ -262,6 +276,16 @@ final readonly class GroupController
                 ->render('Find group', cancelHref: self::BASE);
 
         return $this->page->response('Register a group', $body, $this->crumbs(), $status);
+    }
+
+    private function noGrouper(): ResponseInterface
+    {
+        $body = Html::el('p')->text(
+            'Registering a group checks its name in Grouper, and this application is running without a Grouper connection. '
+            . 'Existing groups can still be edited and mapped to roles.'
+        )->render();
+
+        return $this->page->response('Register a group', $body, $this->crumbs(), 503);
     }
 
     private function unavailable(string $label): ResponseInterface

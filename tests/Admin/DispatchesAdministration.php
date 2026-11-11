@@ -7,6 +7,7 @@ namespace Guild\Framework\Test\Admin;
 use Guild\Framework\Application;
 use Guild\Framework\Authentication\SignInMethod;
 use Guild\Framework\Authorization\IdentitySource;
+use Guild\Framework\Extension\ApplicationExtension;
 use Guild\Framework\Router;
 use Guild\Framework\Session\SessionStore;
 use Guild\Framework\TemplateEngine;
@@ -90,6 +91,8 @@ trait DispatchesAdministration
      * @param  array<string, mixed>|null  $form  a POST body; the session's CSRF token is added unless $csrf is false
      * @param  SignInMethod|null  $signIn  builds an OIDC application whose sign-in method is this one
      * @param  (callable(Router): void)|null  $routes  adds routes of the test's own before dispatch
+     * @param  list<ApplicationExtension>|null  $extensions  boots the application with these extensions and binds no
+     *                                                       GrouperClient, so $grouper is unused
      * @return array{ResponseInterface, GrantsDatabase}
      */
     private function dispatch(
@@ -103,8 +106,9 @@ trait DispatchesAdministration
         bool $csrf = true,
         ?SignInMethod $signIn = null,
         ?callable $routes = null,
+        ?array $extensions = null,
     ): array {
-        $builder = Application::configure($this->basePath)->withLogger(new NullLogger())->addIlluminateDatabase();
+        $builder = Application::configure($this->basePath, $extensions ?? [])->withLogger(new NullLogger())->addIlluminateDatabase();
 
         if ($signIn !== null) {
             file_put_contents($this->basePath . '/config/authentication.php', <<<'PHP'
@@ -141,7 +145,10 @@ trait DispatchesAdministration
         );
 
         // Registered before the lazy provider first resolves, so these win.
-        $app->addShared(GrouperClient::class, new FakeGrouper($grouper)->client);
+        if ($extensions === null) {
+            $app->addShared(GrouperClient::class, new FakeGrouper($grouper)->client);
+        }
+
         $app->addShared(ServerRequestInterface::class, $request, overwrite: true);
         $app->addShared(SessionStore::class, $session, overwrite: true);
 

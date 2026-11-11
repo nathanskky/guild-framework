@@ -129,17 +129,18 @@ packages, so an extension required with `require-dev` never runs in production.
 
 - `addRouting()` requires `{basePath}/routes/routes.php`, which must return a `callable` receiving the
   `Router` instance. **This is the consuming app's routes file, not this repo's `routes/`** — see Landmines.
-- `addAuthentication()` requires `{basePath}/config/authentication.php`, which must return an
-  `OidcConfiguration` instance specifically (checked with `instanceof`, not against an interface). It is
-  handed to `AuthenticationServiceProvider`, which lazily registers `OidcConfiguration`,
-  `OidcAuthenticationService`, `OidcAuthenticationMiddleware`, `SignInMethod` (bound to `IuLoginSignIn`) and
-  `RequireSignIn`. When an extension has chosen the sign-in method (`useSignInMethod()`), the file is not read,
-  a takeover notice is logged, and `SignInMethod` resolves to the chosen class; nothing from guild/access is
-  bound, and `addAuthorization(IdentitySource::Cas, ...)` throws because that claim would go unused. It also mounts
-  `POST /framework/sign-out` (`Controller\Authentication\SignOutController`, behind `VerifyCsrfToken`), which hands the request to `SignInMethod::signOut()`. Templates get
-  `sign_out_form()`, which renders the CSRF-protected form (`Authentication\SignOutForm`); `addAuthentication()`
-  and `addTemplateEngine()` may be called in either order, and whichever runs second registers the eager
-  `AuthenticationTemplateServiceProvider`.
+- `addAuthentication()` requires `{basePath}/config/authentication.php` (unless an installed extension chose
+  the sign-in method), which must return an `OidcConfiguration` instance specifically (checked with
+  `instanceof`, not against an interface). It is handed to `AuthenticationServiceProvider`, which lazily
+  registers `OidcConfiguration`, `OidcAuthenticationService`, `OidcAuthenticationMiddleware`, `SignInMethod`
+  (bound to `IuLoginSignIn`) and `RequireSignIn`. When an extension has chosen the sign-in method
+  (`useSignInMethod()`), the file is not read, a takeover notice is logged, and `SignInMethod` resolves to
+  the chosen class; nothing from guild/access is bound, and `addAuthorization(IdentitySource::Cas, ...)`
+  throws because that claim would go unused. It also mounts `POST /framework/sign-out`
+  (`Controller\Authentication\SignOutController`, behind `VerifyCsrfToken`), which hands the request to
+  `SignInMethod::signOut()`. Templates get `sign_out_form()`, which renders the CSRF-protected form
+  (`Authentication\SignOutForm`); `addAuthentication()` and `addTemplateEngine()` may be called in either
+  order, and whichever runs second registers the eager `AuthenticationTemplateServiceProvider`.
 - `addIlluminateDatabase()` requires `{basePath}/config/database.php` returning an Eloquent connection
   array. It boots a global `Illuminate\Database\Capsule\Manager` and shares it in the container.
 - `enableAutoWiring()` adds a `League\Container\ReflectionContainer` as a delegate, so
@@ -165,15 +166,19 @@ packages, so an extension required with `require-dev` never runs in production.
   `Engine::renderToString()` depending on which engine is bound.
 - `addAuthorization(IdentitySource $identitySource, string $permissions, array $policies = [], ?AdminMenu $adminMenu = new AdminMenu())` requires
   `{basePath}/config/authorization.php`, which must return an `AuthorizationConfiguration` (the System
-  Admin group's ACM label, the membership TTL and stale cap), and `{basePath}/config/grouper.php`, which
-  must return a `GrouperDirectoryConfiguration` (Grouper connection settings and timeouts). `config/grouper.php`
-  is read first and checked with `is_file()`, so an application that has not created it gets a
-  `ConfigurationException` telling it to move its `GrouperConfiguration` there rather than a fatal `require`
-  error. It is the only `add*()` method that takes arguments **and** reads config files, and the split
-  is deliberate: **arguments carry code-level facts** — the identity source and the application's
-  `Permission` enum class, which PHPStan and an IDE can check — **the config file carries everything that
-  varies by deployment**, with the Grouper secret in `config/grouper.php`. With `IdentitySource::Oidc` it **must be called
-  after `addAuthentication()`** and throws `ConfigurationException` otherwise; a CAS application never calls
+  Admin group's ACM label, the membership TTL and stale cap), and `{basePath}/config/grouper.php` (unless an
+  installed extension chose the group directory), which must return a `GrouperDirectoryConfiguration`
+  (Grouper connection settings and timeouts). `config/grouper.php` is read first and checked with
+  `is_file()`, so an application that has not created it gets a `ConfigurationException` telling it to move
+  its `GrouperConfiguration` there rather than a fatal `require` error. When an extension has chosen the
+  group directory (`useGroupDirectory()`), the file is not read, a takeover notice is logged, `GroupDirectory`
+  resolves to the chosen class, and no `GrouperClient` is bound; the group pages then answer 503 on the
+  three register actions, because registering checks a name in Grouper, while editing, mapping and
+  unregistering still work. It is the only `add*()` method that takes arguments **and** reads config
+  files, and the split is deliberate: **arguments carry code-level facts** — the identity source and the
+  application's `Permission` enum class, which PHPStan and an IDE can check — **the config file carries
+  everything that varies by deployment**, with the Grouper secret in `config/grouper.php`. With
+  `IdentitySource::Oidc` it **must be called after `addAuthentication()`** and throws `ConfigurationException` otherwise; a CAS application never calls
   `addAuthentication()`, because Apache authenticates before PHP runs. It registers
   `AuthorizationServiceProvider`, which lazily binds `UserResolver`, `Gate` and what they need.
   `$policies` is a flat list of policy classes, each declaring `#[HandlesResource]`; they are read and
@@ -283,17 +288,17 @@ that file:
 | Builder call | File it requires, under the app's `$basePath` |
 |---|---|
 | `addRouting()` | `routes/routes.php` |
-| `addAuthentication()` | `config/authentication.php` |
+| `addAuthentication()` | `config/authentication.php`, unless an installed extension chose the sign-in method |
 | `addIlluminateDatabase()` | `config/database.php` |
 | `addTemplateEngine()` | none — takes the enum directly; renders from `templates/` |
 | `addRivet()` | none — but requires `addTemplateEngine()` to have been called first |
-| `addAuthorization()` | `config/authorization.php` and `config/grouper.php` — plus arguments for the code-level facts; with OIDC, requires `addAuthentication()` first |
+| `addAuthorization()` | `config/authorization.php`, and `config/grouper.php` unless an installed extension chose the group directory — plus arguments for the code-level facts; with OIDC, requires `addAuthentication()` first |
 | `enableAutoWiring()` | none |
 
 `guild/starter` is the worked example: it does not call `addAuthentication()`, and its
 `addAuthorization()` call is committed commented out, so none of `config/authentication.php`,
-`config/authorization.php` and `config/grouper.php` is loaded and the app runs without them. Its `AGENTS.md` lists the steps to turn
-authorization on.
+`config/authorization.php` and `config/grouper.php` is loaded and the app runs without them. Its `AGENTS.md`
+lists the steps to turn authorization on.
 
 ## Landmines
 

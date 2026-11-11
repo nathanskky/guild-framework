@@ -196,7 +196,9 @@ readonly class ApplicationBuilder
      * and make the current user available through UserResolver.
      *
      * Arguments carry code-level facts; config/authorization.php and
-     * config/grouper.php carry the settings that vary by deployment. With IdentitySource::Oidc this must
+     * config/grouper.php carry the settings that vary by deployment. An extension that chose the group
+     * directory through useGroupDirectory() replaces config/grouper.php: the file is then not read, and
+     * registering groups, which needs Grouper, is unavailable. With IdentitySource::Oidc this must
      * come after addAuthentication(). A CAS application never calls
      * addAuthentication(), because Apache authenticates before PHP runs.
      *
@@ -237,9 +239,20 @@ readonly class ApplicationBuilder
             );
         }
 
-        // Read first: an application upgraded without moving its Grouper settings
-        // otherwise fails on config/authorization.php with a less useful error.
-        $directory = $this->readGrouperDirectoryConfiguration();
+        $directoryClaim = $this->app->claimedSlots->groupDirectory;
+
+        if ($directoryClaim !== null) {
+            $this->app->claimedSlots->takeover(sprintf(
+                'Group directory %s was chosen by %s; config/grouper.php was not read.',
+                $directoryClaim->value,
+                $directoryClaim->claimant,
+            ));
+            $directory = $directoryClaim;
+        } else {
+            // Read first: an application upgraded without moving its Grouper settings
+            // otherwise fails on config/authorization.php with a less useful error.
+            $directory = $this->readGrouperDirectoryConfiguration();
+        }
 
         $configFilePath = $this->app->getPath('config') . '/authorization.php';
 

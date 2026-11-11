@@ -32,6 +32,7 @@ use Guild\Framework\Controller\Authorization\GroupController;
 use Guild\Framework\Controller\Authorization\OverviewController;
 use Guild\Framework\Controller\Authorization\RoleController;
 use Guild\Framework\Exception\ConfigurationException;
+use Guild\Framework\Extension\SlotClaim;
 use Guild\Framework\Middleware\AuthorizationFailureResponder;
 use Guild\Framework\Middleware\RequireSystemAdmin;
 use Guild\Framework\Session\SessionStore;
@@ -48,6 +49,9 @@ use Psr\Log\LoggerInterface;
 class AuthorizationServiceProvider extends AbstractServiceProvider
 {
     /**
+     * @param  GrouperDirectoryConfiguration|SlotClaim  $directory  Where groups come from: live Grouper, or
+     *                                                              the class an extension chose. Only live
+     *                                                              Grouper binds a GrouperClient.
      * @param  class-string<Permission>  $permissionEnum
      * @param  list<class-string>  $policies
      */
@@ -55,7 +59,7 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
         private readonly IdentitySource $identitySource,
         private readonly string $permissionEnum,
         private readonly AuthorizationConfiguration $config,
-        private readonly GrouperDirectoryConfiguration $directory,
+        private readonly GrouperDirectoryConfiguration|SlotClaim $directory,
         private readonly array $policies = [],
         private readonly ?AdminMenu $adminMenu = new AdminMenu(),
     ) {
@@ -79,10 +83,13 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
             MembershipProvider::class,
             MembershipCache::class,
             GrantRepository::class,
-            GrouperClient::class,
             GroupDirectory::class,
             AuthorizationConfiguration::class,
         ];
+
+        if ($this->directory instanceof GrouperDirectoryConfiguration) {
+            $services[] = GrouperClient::class;
+        }
 
         if ($this->adminMenu !== null) {
             $services[] = NavigationProvider::class;
@@ -98,15 +105,7 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
 
         $container->addShared(AuthorizationConfiguration::class, $config);
 
-        $directory = $this->directory;
-
-        $container->addShared(GrouperClient::class, static fn (): GrouperClient => new GrouperClient(
-            $directory->grouper,
-            new Client([
-                'timeout' => $directory->timeout,
-                'connect_timeout' => $directory->connectTimeout,
-            ]),
-        ));
+        $this->registerGroupDirectory($container);
 
         $session = static function () use ($container): SessionStore {
             /** @var SessionStore $session */
@@ -116,13 +115,6 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
         };
 
         $container->addShared(MembershipCache::class, static fn (): MembershipCache => new MembershipCache($session()));
-
-        $container->addShared(GroupDirectory::class, static function () use ($container): GroupDirectory {
-            /** @var GrouperClient $grouper */
-            $grouper = $container->get(GrouperClient::class);
-
-            return new GrouperGroupDirectory($grouper);
-        });
 
         $container->addShared(MembershipProvider::class, static function () use ($container, $config): MembershipProvider {
             /** @var GroupDirectory $directory */
@@ -210,6 +202,37 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
                 return new AdminNavigation($users, $adminMenu, $request);
             });
         }
+    }
+
+    /**
+     * Where users' groups come from. Given the Grouper configuration, that is
+     * a GrouperClient and the directory over it; given a claim, it is whichever
+     * class an extension chose, and no GrouperClient is bound.
+     */
+    private function registerGroupDirectory(DefinitionContainerInterface $container): void
+    {
+        $directory = $this->directory;
+
+        if ($directory instanceof SlotClaim) {
+            $container->addShared(GroupDirectory::class, static fn (): mixed => $container->get($directory->value));
+
+            return;
+        }
+
+        $container->addShared(GrouperClient::class, static fn (): GrouperClient => new GrouperClient(
+            $directory->grouper,
+            new Client([
+                'timeout' => $directory->timeout,
+                'connect_timeout' => $directory->connectTimeout,
+            ]),
+        ));
+
+        $container->addShared(GroupDirectory::class, static function () use ($container): GroupDirectory {
+            /** @var GrouperClient $grouper */
+            $grouper = $container->get(GrouperClient::class);
+
+            return new GrouperGroupDirectory($grouper);
+        });
     }
 
     /**
@@ -313,9 +336,11 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
             return new Actor($users);
         };
 
-        $container->addShared(GroupController::class, static function () use ($container, $page, $flash, $csrf, $actor): GroupController {
-            /** @var GrouperClient $grouper */
-            $grouper = $container->get(GrouperClient::class);
+        $hasGrouper = $this->directory instanceof GrouperDirectoryConfiguration;
+
+        $container->addShared(GroupController::class, static function () use ($container, $page, $flash, $csrf, $actor, $hasGrouper): GroupController {
+            /** @var GrouperClient|null $grouper */
+            $grouper = $hasGrouper ? $container->get(GrouperClient::class) : null;
 
             return new GroupController($page(), $flash(), $csrf(), $actor(), $grouper);
         });

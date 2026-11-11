@@ -6,6 +6,9 @@ namespace Guild\Framework\Test\Admin;
 
 use Guild\Grouper\Testing\FakeGrouper;
 use Guild\Framework\Test\Authorization\Support\GrantsDatabase;
+use Guild\Framework\Test\Extension\Support\ArrayGroupDirectory;
+use Guild\Framework\Test\Extension\Support\ClaimingExtension;
+use Guild\Grouper\GrouperGroup;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
@@ -59,6 +62,29 @@ final class AdministrationFormsTest extends TestCase
         self::assertSame(503, $response->getStatusCode(), '"could not ask" is not "no such group"');
         self::assertStringContainsString('does not mean the group is missing', $html);
         self::assertStringNotContainsString('No group labelled', $html);
+    }
+
+    public function testWithoutGrouperRegisteringAGroupExplainsWhy(): void
+    {
+        $admins = new GrouperGroup('iu:x-admins', 'Indiana University:X:Admins', 'My App Admins', 'uuid-1');
+        $extension = new ClaimingExtension(directory: new ArrayGroupDirectory(['jdoe' => [$admins]]));
+        $explanation = 'Registering a group checks its name in Grouper, and this application is running without a Grouper connection. '
+            . 'Existing groups can still be edited and mapped to roles.';
+
+        foreach (['GET' => null, 'POST' => ['label' => 'X Editors']] as $method => $form) {
+            [$response, $db] = $this->dispatch(
+                $method,
+                '/framework/authorization/groups/register',
+                'jdoe',
+                [],
+                form: $form,
+                extensions: [$extension],
+            );
+
+            self::assertSame(503, $response->getStatusCode(), "$method: registering needs Grouper, which is not connected");
+            self::assertStringContainsString($explanation, (string) $response->getBody(), "$method: the page says why");
+            self::assertSame(0, $db->connection->table('framework_groups')->count(), "$method: nothing is registered");
+        }
     }
 
     public function testSeveralMatchesAreOfferedByIdentifier(): void
