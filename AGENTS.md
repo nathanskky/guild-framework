@@ -26,7 +26,7 @@ root-level tooling or a shared root autoloader.
 |---|---|---|
 | `guild/framework` *(this one)* | `Guild\Framework\` | Application kernel / DI container |
 | `guild/access` | `Guild\Access\` | IU Login (OIDC) authentication library. **This package depends on it** (`^1.0`, via VCS repo) |
-| `guild/grouper` | `Guild\Grouper\` | Read-only IU Grouper group-membership lookup. **This package depends on it** (`^0.1.2`, via VCS repo). Pre-1.0 — treat minor releases as potentially breaking |
+| `guild/grouper` | `Guild\Grouper\` | Read-only IU Grouper group-membership lookup. **This package depends on it** (`^0.1.3`, via VCS repo). Pre-1.0 — treat minor releases as potentially breaking |
 | `guild/starter` | `Guild\Starter\` | Runnable example app; the primary consumer of this package |
 | `iu/notifications` | `IU\Notifications\` | IU Notifications API client. Fully independent — different GitHub host, and its `<8.5` PHP constraint is mutually exclusive with this package's `~8.5.0` |
 | `guild/rivet` | `Guild\Rivet\` | IU Rivet Design System components for Twig and Latte, exposed through `ApplicationBuilder::addRivet()`. **This package depends on it** (`^1.0`, via VCS repo) |
@@ -74,7 +74,7 @@ belong under `Guild\Framework\Test\` (autoload-dev maps this to `tests/`); `test
 local reference, following the house style of `access/tests/`:
 
 - No PHPUnit mocks. Grouper is a real `GrouperClient` over Guzzle's `MockHandler`
-  (`tests/Authorization/Support/FakeGrouper.php`); the authorization tables are in-memory SQLite
+  (`Guild\Grouper\Testing\FakeGrouper`, shipped by guild/grouper); the authorization tables are in-memory SQLite
   (`Support/GrantsDatabase.php`).
 - Anything touching the PHP session runs with `#[RunTestsInSeparateProcesses]` and
   `#[PreserveGlobalState(false)]`, and uses a real `session_start()`.
@@ -420,7 +420,7 @@ change never reaches the real package.
 Note the mixed auth paths: this repo's `origin` is SSH, but it pulls `guild/access`, `guild/grouper` and
 `guild/rivet` over **HTTPS**, so `composer update` may prompt for GitHub credentials in places where
 `git push` works fine. Bumping `guild/access`, `guild/grouper` or `guild/rivet` additionally requires a
-**new git tag** in that repo, because the constraints here (`^1.0`, `^0.1.2`, `^1.0`) are tag constraints.
+**new git tag** in that repo, because the constraints here (`^1.0`, `^0.1.3`, `^1.0`) are tag constraints.
 
 Composer reads `repositories` only from the root package, so **every consumer declares the VCS
 repositories for `guild/access`, `guild/grouper` and `guild/rivet` as well as this one** — `starter` does.
