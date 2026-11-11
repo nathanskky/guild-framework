@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Guild\Framework\Middleware;
 
 use Guild\Framework\Authentication\SignInMethod;
+use Guild\Framework\Authorization\Identity\IdentityReader;
 use Guild\Framework\Authorization\StatusPage;
 use Guild\Framework\Exception\AuthenticationRequiredException;
 use Guild\Framework\Exception\AuthorizationException;
@@ -19,6 +20,11 @@ use Psr\Http\Server\RequestHandlerInterface;
  * sent to sign in, a denied user gets a 403, and a membership that could not
  * be confirmed gets a 503. Any other exception propagates.
  *
+ * Whether to challenge is decided here, from who is signed in, not by the
+ * exception alone: a visitor who is already signed in gets the 403 even when
+ * AuthenticationRequiredException was thrown, because signing in again cannot
+ * help them. SignInMethod::challenge() is only ever asked to sign a guest in.
+ *
  * Without a sign-in method (CAS, where Apache authenticates requests) a guest
  * is told to sign in on a 403, since there is nowhere to send them.
  *
@@ -28,6 +34,7 @@ final readonly class AuthorizationFailureResponder implements MiddlewareInterfac
 {
     public function __construct(
         private StatusPage $page,
+        private IdentityReader $identities,
         private ?SignInMethod $signIn,
     ) {
     }
@@ -38,6 +45,10 @@ final readonly class AuthorizationFailureResponder implements MiddlewareInterfac
         try {
             return $handler->handle($request);
         } catch (AuthenticationRequiredException) {
+            if ($this->identities->read() !== null) {
+                return $this->forbidden();
+            }
+
             if ($this->signIn !== null) {
                 return $this->signIn->challenge($request);
             }
@@ -48,7 +59,7 @@ final readonly class AuthorizationFailureResponder implements MiddlewareInterfac
                 403,
             );
         } catch (AuthorizationException) {
-            return $this->page->response('Not authorized', 'You do not have permission to view this page.', 403);
+            return $this->forbidden();
         } catch (AuthorizationUnavailableException) {
             return $this->page->response(
                 'Temporarily unavailable',
@@ -56,5 +67,10 @@ final readonly class AuthorizationFailureResponder implements MiddlewareInterfac
                 503,
             );
         }
+    }
+
+    private function forbidden(): ResponseInterface
+    {
+        return $this->page->response('Not authorized', 'You do not have permission to view this page.', 403);
     }
 }

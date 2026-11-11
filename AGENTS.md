@@ -215,7 +215,9 @@ Application::configure($basePath)
   determined — Grouper is unreachable and no cached membership is recent enough. The last is deliberately
   not a denial type: it is a 503, not a 403. `Middleware\AuthorizationFailureResponder`, which
   `addAuthorization()` installs at router level, answers all three: a 403, a sign-in challenge under OIDC
-  (a 403 "Sign in required" under CAS), and a 503.
+  (a 403 "Sign in required" under CAS), and a 503. It challenges only a guest: it reads the request's
+  `IdentityReader`, and a visitor who is already signed in gets the 403 even for
+  `AuthenticationRequiredException`, so `SignInMethod::challenge()` never has to handle a signed-in visitor.
   **`addRouting()` does not do this** — it is not wrapped in a try/catch, so a missing or broken
   `routes/routes.php` surfaces as a raw `require` failure. And if the file loads but returns something that
   is not callable, the `is_callable()` guard means **no routes are registered and no error is raised** —

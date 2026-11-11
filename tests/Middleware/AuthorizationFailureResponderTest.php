@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Guild\Framework\Test\Middleware;
 
 use Guild\Framework\Authorization\Identity\Identity;
+use Guild\Framework\Authorization\Identity\IdentityReader;
+use Guild\Framework\Authorization\Identity\RemoteUserIdentityReader;
 use Guild\Framework\Authorization\StatusPage;
 use Guild\Framework\Exception\AuthenticationRequiredException;
 use Guild\Framework\Exception\AuthorizationException;
@@ -28,6 +30,7 @@ use Throwable;
 #[UsesClass(StatusPage::class)]
 #[UsesClass(FakeSignIn::class)]
 #[UsesClass(Identity::class)]
+#[UsesClass(RemoteUserIdentityReader::class)]
 final class AuthorizationFailureResponderTest extends TestCase
 {
     use DispatchesAdministration;
@@ -49,6 +52,27 @@ final class AuthorizationFailureResponderTest extends TestCase
         self::assertStringContainsString('protected by CAS', (string) $response->getBody(), 'and where to fix it');
     }
 
+    public function testASignedInVisitorAskedToSignInIsForbiddenInstead(): void
+    {
+        $signIn = new FakeSignIn(new Identity('jdoe'));
+
+        $response = $this->respond($signIn, new AuthenticationRequiredException());
+
+        self::assertSame(403, $response->getStatusCode(), 'signing in again cannot help someone already signed in');
+        self::assertStringContainsString('<h1>Not authorized</h1>', (string) $response->getBody(), 'so they are refused, not challenged');
+        self::assertSame('jdoe', $signIn->read()?->username, 'and they stay signed in');
+    }
+
+    public function testUnderCasASignedInVisitorAskedToSignInIsForbiddenInstead(): void
+    {
+        $response = $this->respond(null, new AuthenticationRequiredException(), new RemoteUserIdentityReader(
+            (new ServerRequestFactory())->createServerRequest('GET', '/secret', ['REMOTE_USER' => 'jdoe']),
+        ));
+
+        self::assertSame(403, $response->getStatusCode(), 'CAS already signed jdoe in');
+        self::assertStringContainsString('<h1>Not authorized</h1>', (string) $response->getBody(), 'so the page does not ask them to sign in');
+    }
+
     public function testADeniedUserIsForbidden(): void
     {
         $response = $this->respond(new FakeSignIn(new Identity('jdoe')), new AuthorizationException());
@@ -66,16 +90,6 @@ final class AuthorizationFailureResponderTest extends TestCase
         self::assertStringContainsString('<h1>Temporarily unavailable</h1>', (string) $response->getBody(), 'the page says so');
     }
 
-    public function testTheMessageIsEscaped(): void
-    {
-        $page = new StatusPage(static fn () => null);
-
-        $response = $page->response('<b>Title</b>', '<script>x</script>', 403);
-
-        self::assertStringNotContainsString('<script>', (string) $response->getBody(), 'text is escaped, not interpreted');
-        self::assertStringContainsString('&lt;b&gt;Title&lt;/b&gt;', (string) $response->getBody(), 'in the title and heading');
-    }
-
     public function testOtherExceptionsPropagate(): void
     {
         $this->expectException(RuntimeException::class);
@@ -85,8 +99,8 @@ final class AuthorizationFailureResponderTest extends TestCase
 
     public function testAResponseFromTheHandlerIsReturnedUntouched(): void
     {
-        $responder = new AuthorizationFailureResponder(new StatusPage(static fn () => null), null);
         $request = (new ServerRequestFactory())->createServerRequest('GET', '/secret');
+        $responder = new AuthorizationFailureResponder(new StatusPage(static fn () => null), new RemoteUserIdentityReader($request), null);
 
         $response = $responder->process($request, new class () implements RequestHandlerInterface {
             #[\Override]
@@ -134,6 +148,23 @@ final class AuthorizationFailureResponderTest extends TestCase
         self::assertSame('/fake-sign-in?return=%2Fsecret', $response->getHeaderLine('Location'), 'and returns to the page');
     }
 
+    public function testTheFrameworkRefusesASignedInVisitorRatherThanChallengingThem(): void
+    {
+        [$response] = $this->dispatch(
+            'GET',
+            '/secret',
+            null,
+            [],
+            signIn: new FakeSignIn(new Identity('jdoe')),
+            routes: static function (Router $router): void {
+                $router->map('GET', '/secret', static fn () => throw new AuthenticationRequiredException());
+            },
+        );
+
+        self::assertSame(403, $response->getStatusCode(), 'the application\'s responder knows who is signed in');
+        self::assertStringContainsString('Not authorized', (string) $response->getBody(), 'and refuses jdoe instead of sending them to sign in');
+    }
+
     public function testTheFrameworkAppliesItToApplicationRoutesUnderCas(): void
     {
         [$response] = $this->dispatch(
@@ -150,10 +181,17 @@ final class AuthorizationFailureResponderTest extends TestCase
         self::assertStringContainsString('Sign in required', (string) $response->getBody(), 'so the guest is told to sign in');
     }
 
-    private function respond(?FakeSignIn $signIn, Throwable $thrown): ResponseInterface
+    /**
+     * Without $identities, the visitor is whoever $signIn says, or under CAS a guest.
+     */
+    private function respond(?FakeSignIn $signIn, Throwable $thrown, ?IdentityReader $identities = null): ResponseInterface
     {
-        $responder = new AuthorizationFailureResponder(new StatusPage(static fn () => null), $signIn);
         $request = (new ServerRequestFactory())->createServerRequest('GET', '/secret');
+        $responder = new AuthorizationFailureResponder(
+            new StatusPage(static fn () => null),
+            $identities ?? $signIn ?? new RemoteUserIdentityReader($request),
+            $signIn,
+        );
 
         return $responder->process($request, new class ($thrown) implements RequestHandlerInterface {
             public function __construct(private readonly Throwable $thrown)

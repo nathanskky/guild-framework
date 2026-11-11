@@ -17,7 +17,11 @@ interface SignInMethod extends IdentityReader
     /** Let a signed-in request through, or start signing the visitor in. */
     public function requireSignIn(ServerRequestInterface $request, RequestHandlerInterface $next): ResponseInterface;
 
-    /** Ask a guest to sign in, e.g. after AuthenticationRequiredException. */
+    /**
+     * Ask a guest to sign in, e.g. after AuthenticationRequiredException. The
+     * framework calls this only for a guest; a signed-in visitor who is
+     * refused gets a 403 from AuthorizationFailureResponder instead.
+     */
     public function challenge(ServerRequestInterface $request): ResponseInterface;
 
     /** End the signed-in session and say where to go next. */

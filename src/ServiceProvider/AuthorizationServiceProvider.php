@@ -254,15 +254,17 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
         $container->addShared(AuthorizationFailureResponder::class, static function () use ($container, $identitySource): AuthorizationFailureResponder {
             /** @var StatusPage $page */
             $page = $container->get(StatusPage::class);
+            /** @var IdentityReader $identities */
+            $identities = $container->get(IdentityReader::class);
 
             if ($identitySource !== IdentitySource::Oidc) {
-                return new AuthorizationFailureResponder($page, null);
+                return new AuthorizationFailureResponder($page, $identities, null);
             }
 
             /** @var SignInMethod $signIn */
             $signIn = $container->get(SignInMethod::class);
 
-            return new AuthorizationFailureResponder($page, $signIn);
+            return new AuthorizationFailureResponder($page, $identities, $signIn);
         });
     }
 
