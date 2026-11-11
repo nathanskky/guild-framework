@@ -173,11 +173,13 @@ Application::configure($basePath)
   underlying parse/type error — or, for `config/grouper.php`, a `GrouperConfigurationException` from
   constructing `GrouperConfiguration` — propagate raw. `ConfigurationException` covers configuration only.
   Three runtime types sit alongside it, all `RuntimeException`s:
-  `Exception\AuthorizationException` is a denial from `Gate::authorize()` (render as 403);
-  `Exception\AuthenticationRequiredException` extends it for a denied guest, so an OIDC app can redirect
-  to login instead; `Exception\AuthorizationUnavailableException` means group membership could not be
+  `Exception\AuthorizationException` is a denial from `Gate::authorize()`;
+  `Exception\AuthenticationRequiredException` extends it for a denied guest;
+  `Exception\AuthorizationUnavailableException` means group membership could not be
   determined — Grouper is unreachable and no cached membership is recent enough. The last is deliberately
-  not a denial type, so an application can render it as a 503 rather than a 403.
+  not a denial type: it is a 503, not a 403. `Middleware\AuthorizationFailureResponder`, which
+  `addAuthorization()` installs at router level, answers all three: a 403, a sign-in challenge under OIDC
+  (a 403 "Sign in required" under CAS), and a 503.
   **`addRouting()` does not do this** — it is not wrapped in a try/catch, so a missing or broken
   `routes/routes.php` surfaces as a raw `require` failure. And if the file loads but returns something that
   is not callable, the `is_callable()` guard means **no routes are registered and no error is raised** —
@@ -340,7 +342,7 @@ authorization on.
   every column.
 - **`View::render()` unwraps `AuthorizationUnavailableException`.** Twig wraps anything thrown inside a
   template function in `Twig\Error\RuntimeError`; Latte does not. `View` rethrows the unavailable exception
-  as itself under both engines so an application's 503 handling sees it. Everything else stays wrapped,
+  as itself under both engines so `AuthorizationFailureResponder` sees it. Everything else stays wrapped,
   keeping Twig's template name and line. Rendering through `Environment` directly bypasses this.
 - **Only Grouper membership is cached; grants are read fresh.** Membership lives in the PHP session under
   `guild_framework_membership` for the configured TTL, is served stale up to the stale cap while Grouper is

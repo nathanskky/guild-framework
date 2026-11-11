@@ -20,8 +20,8 @@ readonly class View
     /**
      * An AuthorizationUnavailableException raised while rendering, typically
      * from can() in a template, is rethrown as itself under both engines. Twig
-     * would otherwise wrap it in a RuntimeError, and an application that
-     * renders "could not ask" as a 503 would never see it.
+     * would otherwise wrap it in a RuntimeError, and AuthorizationFailureResponder
+     * would never see it to answer "could not ask" with a 503.
      *
      * @param  array<string, mixed>  $data
      *

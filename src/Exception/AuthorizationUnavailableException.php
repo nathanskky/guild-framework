@@ -12,8 +12,8 @@ use RuntimeException;
  * cached membership is recent enough to use.
  *
  * Deliberately not an AuthorizationException. "You may not" and "we could not
- * ask" must not render the same way; an application typically renders this as
- * a 503 rather than a 403.
+ * ask" must not render the same way; addAuthorization() answers this with a
+ * 503, not a 403.
  */
 class AuthorizationUnavailableException extends RuntimeException
 {
