@@ -112,9 +112,52 @@ readonly class ApplicationBuilder
         return $this;
     }
 
+    /**
+     * Sign people in with IU Login, configured by config/authentication.php.
+     * An extension that chose the sign-in method through useSignInMethod()
+     * replaces that: the file is then not read.
+     */
     public function addAuthentication(): self
     {
+        $claim = $this->app->claimedSlots->signInMethod;
+
+        if ($claim !== null) {
+            $this->app->claimedSlots->takeover(sprintf(
+                'Sign-in method %s was chosen by %s; config/authentication.php was not read.',
+                $claim->value,
+                $claim->claimant,
+            ));
+            $this->app->addServiceProvider(new AuthenticationServiceProvider($claim));
+        } else {
+            $this->app->addServiceProvider(new AuthenticationServiceProvider($this->readAuthenticationConfiguration()));
+        }
+
+        $this->app->markAuthenticationAdded();
+        $this->registerSignOutRoute();
+
+        $engine = $this->app->getTemplateEngine();
+
+        if ($engine !== null) {
+            $this->app->addServiceProvider(new AuthenticationTemplateServiceProvider($engine));
+        }
+
+        return $this;
+    }
+
+    /**
+     * Read config/authentication.php: how to reach IU Login.
+     */
+    private function readAuthenticationConfiguration(): OidcConfiguration
+    {
         $configFilePath = $this->app->getPath('config') . '/authentication.php';
+
+        // A missing file would only raise a warning, which says nothing about what to create.
+        if (! is_file($configFilePath)) {
+            throw new ConfigurationException(
+                'Problem encountered while attempting to read authentication config file: '
+                . 'config/authentication.php was not found. Create it, returning an OidcConfiguration.'
+            );
+        }
 
         try {
             $config = require $configFilePath;
@@ -129,17 +172,7 @@ readonly class ApplicationBuilder
             throw new ConfigurationException('Authentication configuration file must return an instance of OidcConfiguration.');
         }
 
-        $this->app->addServiceProvider(new AuthenticationServiceProvider($config));
-        $this->app->markAuthenticationAdded();
-        $this->registerSignOutRoute();
-
-        $engine = $this->app->getTemplateEngine();
-
-        if ($engine !== null) {
-            $this->app->addServiceProvider(new AuthenticationTemplateServiceProvider($engine));
-        }
-
-        return $this;
+        return $config;
     }
 
     /**
@@ -184,6 +217,19 @@ readonly class ApplicationBuilder
         array $policies = [],
         ?AdminMenu $adminMenu = new AdminMenu(),
     ): self {
+        $signInClaim = $this->app->claimedSlots->signInMethod;
+
+        // Checked before any config file is read: the claim would otherwise be silently
+        // ignored, because CAS identities come from REMOTE_USER.
+        if ($identitySource === IdentitySource::Cas && $signInClaim !== null) {
+            throw new ConfigurationException(sprintf(
+                '%s was chosen as the sign-in method by %s, but addAuthorization() was given IdentitySource::Cas. '
+                . 'A chosen sign-in method needs IdentitySource::Oidc and addAuthentication().',
+                $signInClaim->value,
+                $signInClaim->claimant,
+            ));
+        }
+
         if ($identitySource === IdentitySource::Oidc && ! $this->app->isAuthenticationAdded()) {
             throw new ConfigurationException(
                 'addAuthorization() was given IdentitySource::Oidc, but addAuthentication() has not been called. '

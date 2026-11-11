@@ -133,8 +133,10 @@ packages, so an extension required with `require-dev` never runs in production.
   `OidcConfiguration` instance specifically (checked with `instanceof`, not against an interface). It is
   handed to `AuthenticationServiceProvider`, which lazily registers `OidcConfiguration`,
   `OidcAuthenticationService`, `OidcAuthenticationMiddleware`, `SignInMethod` (bound to `IuLoginSignIn`) and
-  `RequireSignIn`. It also mounts `POST /framework/sign-out` (`Controller\Authentication\SignOutController`,
-  behind `VerifyCsrfToken`), which hands the request to `SignInMethod::signOut()`. Templates get
+  `RequireSignIn`. When an extension has chosen the sign-in method (`useSignInMethod()`), the file is not read,
+  a takeover notice is logged, and `SignInMethod` resolves to the chosen class; nothing from guild/access is
+  bound, and `addAuthorization(IdentitySource::Cas, ...)` throws because that claim would go unused. It also mounts
+  `POST /framework/sign-out` (`Controller\Authentication\SignOutController`, behind `VerifyCsrfToken`), which hands the request to `SignInMethod::signOut()`. Templates get
   `sign_out_form()`, which renders the CSRF-protected form (`Authentication\SignOutForm`); `addAuthentication()`
   and `addTemplateEngine()` may be called in either order, and whichever runs second registers the eager
   `AuthenticationTemplateServiceProvider`.
