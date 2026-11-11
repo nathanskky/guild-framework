@@ -10,16 +10,20 @@ use Guild\Framework\Authorization\Gate;
 use Guild\Framework\Authorization\GrantRepository;
 use Guild\Framework\Authorization\Handles;
 use Guild\Framework\Authorization\HandlesResource;
+use Guild\Framework\Authorization\Identity\Identity;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
 use Guild\Framework\Authorization\Policy\PolicyMethod;
 use Guild\Framework\Authorization\Policy\PolicyRegistry;
 use Guild\Framework\Authorization\TemplateAuthorization;
+use Guild\Framework\Authorization\User;
 use Guild\Framework\Authorization\UserResolver;
 use Guild\Framework\Exception\ConfigurationException;
 use Guild\Framework\Test\Authorization\Support\GateFactory;
+use Guild\Framework\Test\Authorization\Support\GrantsDatabase;
 use Guild\Framework\Test\Authorization\Support\Policy\Document;
 use Guild\Framework\Test\Authorization\Support\TestPermission;
+use Guild\Grouper\Testing\FakeGrouper;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
@@ -31,6 +35,8 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(TemplateAuthorization::class)]
 #[UsesClass(Gate::class)]
 #[UsesClass(UserResolver::class)]
+#[UsesClass(User::class)]
+#[UsesClass(Identity::class)]
 #[UsesClass(PolicyRegistry::class)]
 #[UsesClass(PolicyMethod::class)]
 #[UsesClass(Handles::class)]
@@ -67,7 +73,7 @@ final class TemplateAuthorizationTest extends TestCase
             $resolutions++;
 
             return GateFactory::guest();
-        }, TestPermission::class);
+        }, static fn (): UserResolver => self::fail('current_user() was not called'), TestPermission::class);
 
         self::assertSame(0, $resolutions, 'a page that never checks costs nothing');
 
@@ -77,8 +83,35 @@ final class TemplateAuthorizationTest extends TestCase
         self::assertSame(1, $resolutions, 'and the Gate is resolved once');
     }
 
+    public function testTheUserResolverIsNotResolvedUntilCurrentUserIsCalled(): void
+    {
+        $resolutions = 0;
+        $authorization = new TemplateAuthorization(
+            GateFactory::guest(...),
+            static function () use (&$resolutions): UserResolver {
+                $resolutions++;
+
+                return GateFactory::resolver(new FakeGrouper([]), new Identity('jdoe'), new GrantsDatabase());
+            },
+            TestPermission::class,
+        );
+
+        self::assertSame(0, $resolutions, 'a page that never asks for the user costs nothing');
+        self::assertTrue($authorization->can('documents.view', new Document('jdoe', public: true)), 'can() does not resolve it');
+        self::assertSame(0, $resolutions, 'checking a permission leaves the resolver alone');
+
+        self::assertSame('jdoe', $authorization->currentUser()?->username(), 'the signed-in user');
+        $authorization->currentUser();
+
+        self::assertSame(1, $resolutions, 'and the resolver is resolved once');
+    }
+
     private function authorization(): TemplateAuthorization
     {
-        return new TemplateAuthorization(GateFactory::guest(...), TestPermission::class);
+        return new TemplateAuthorization(
+            GateFactory::guest(...),
+            static fn (): UserResolver => self::fail('current_user() was not called'),
+            TestPermission::class,
+        );
     }
 }

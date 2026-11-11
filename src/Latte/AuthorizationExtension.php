@@ -8,9 +8,10 @@ use Guild\Framework\Authorization\TemplateAuthorization;
 use Latte\Extension;
 
 /**
- * can() and cannot() for Latte templates:
+ * can(), cannot() and current_user() for Latte templates:
  *
  *     {if can('documents.update', $document)}…{/if}
+ *     {current_user()?->username()}
  */
 final class AuthorizationExtension extends Extension
 {
@@ -23,6 +24,7 @@ final class AuthorizationExtension extends Extension
         return [
             'can' => $this->authorization->can(...),
             'cannot' => $this->authorization->cannot(...),
+            'current_user' => $this->authorization->currentUser(...),
         ];
     }
 }

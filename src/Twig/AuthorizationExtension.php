@@ -9,9 +9,10 @@ use Twig\Extension\AbstractExtension;
 use Twig\TwigFunction;
 
 /**
- * can() and cannot() for Twig templates:
+ * can(), cannot() and current_user() for Twig templates:
  *
  *     {% if can('documents.update', document) %}…{% endif %}
+ *     {{ current_user().username }}
  */
 final class AuthorizationExtension extends AbstractExtension
 {
@@ -24,6 +25,7 @@ final class AuthorizationExtension extends AbstractExtension
         return [
             new TwigFunction('can', $this->authorization->can(...)),
             new TwigFunction('cannot', $this->authorization->cannot(...)),
+            new TwigFunction('current_user', $this->authorization->currentUser(...)),
         ];
     }
 }

@@ -108,6 +108,31 @@ final class TemplateFunctionsTest extends TestCase
     }
 
     /**
+     * @return iterable<string, array{string, string, string}> engine, signed-in template, guest template
+     */
+    public static function currentUserTemplates(): iterable
+    {
+        yield 'Twig' => ['twig', "{{ current_user().username }}", "{{ current_user() is null ? 'guest' : 'user' }}"];
+        yield 'Latte' => ['latte', '{current_user()->username()}', "{current_user() === null ? 'guest' : 'user'}"];
+    }
+
+    #[DataProvider('currentUserTemplates')]
+    public function testCurrentUserRendersTheSignedInUserInBothEngines(string $engine, string $signedIn, string $guest): void
+    {
+        $users = GateFactory::resolver(new FakeGrouper([]), new Identity('jdoe'), new GrantsDatabase());
+
+        self::assertSame('jdoe', $this->view($engine, $signedIn, GateFactory::guest(), $users)->render('t'), "{$engine} renders the username");
+    }
+
+    #[DataProvider('currentUserTemplates')]
+    public function testCurrentUserIsNullForAGuestInBothEngines(string $engine, string $signedIn, string $guest): void
+    {
+        $view = $this->view($engine, $guest, GateFactory::guest());
+
+        self::assertSame('guest', $view->render('t'), "{$engine} sees no user");
+    }
+
+    /**
      * @return iterable<string, array{string, string}>
      */
     public static function unavailableTemplates(): iterable
@@ -183,9 +208,14 @@ final class TemplateFunctionsTest extends TestCase
         }
     }
 
-    private function view(string $engine, string $template, Gate $gate): View
+    private function view(string $engine, string $template, Gate $gate, ?UserResolver $users = null): View
     {
-        $authorization = new TemplateAuthorization(static fn (): Gate => $gate, TestPermission::class);
+        $users ??= GateFactory::resolver(new FakeGrouper([]), null, new GrantsDatabase());
+        $authorization = new TemplateAuthorization(
+            static fn (): Gate => $gate,
+            static fn (): UserResolver => $users,
+            TestPermission::class,
+        );
 
         if ($engine === 'twig') {
             $twig = new Environment(new ArrayLoader(['t' => $template]));

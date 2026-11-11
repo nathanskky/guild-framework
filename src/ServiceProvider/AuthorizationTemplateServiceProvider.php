@@ -7,6 +7,7 @@ namespace Guild\Framework\ServiceProvider;
 use Guild\Framework\Authorization\Gate;
 use Guild\Framework\Authorization\Permission;
 use Guild\Framework\Authorization\TemplateAuthorization;
+use Guild\Framework\Authorization\UserResolver;
 use Guild\Framework\Exception\ConfigurationException;
 use Guild\Framework\Latte\AuthorizationExtension as LatteAuthorizationExtension;
 use Guild\Framework\TemplateEngine;
@@ -17,7 +18,7 @@ use League\Container\ServiceProvider\BootableServiceProviderInterface;
 use Twig\Environment;
 
 /**
- * Adds can() and cannot() to the configured template engine.
+ * Adds can(), cannot() and current_user() to the configured template engine.
  *
  * Eager for the same reason as RivetServiceProvider: nothing asks the
  * container for these, templates reach them through the engine. Registered by
@@ -48,6 +49,15 @@ class AuthorizationTemplateServiceProvider extends AbstractServiceProvider imple
                 }
 
                 return $gate;
+            },
+            static function () use ($container): UserResolver {
+                $users = $container->get(UserResolver::class);
+
+                if (! $users instanceof UserResolver) {
+                    throw new ConfigurationException('The container did not return a UserResolver.');
+                }
+
+                return $users;
             },
             $this->permissionEnum,
         );

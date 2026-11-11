@@ -9,15 +9,15 @@ use Guild\Framework\Exception\AuthorizationUnavailableException;
 use Guild\Framework\Exception\ConfigurationException;
 
 /**
- * The engine-neutral half of the template can()/cannot() functions.
+ * The engine-neutral half of the template can()/cannot()/current_user() functions.
  *
  * Templates may name a permission by its case or by its stored value
  * ('documents.update'). Templates are not statically analysed either way, so
  * the value string costs nothing a case would have caught; an unknown value
  * throws when the template renders rather than quietly denying.
  *
- * The Gate is resolved on first use, so a page that never checks costs
- * nothing.
+ * The Gate and the UserResolver are each resolved on first use, so a page that
+ * never checks costs nothing.
  *
  * @internal
  */
@@ -25,12 +25,16 @@ final class TemplateAuthorization
 {
     private ?Gate $gate = null;
 
+    private ?UserResolver $users = null;
+
     /**
      * @param  Closure(): Gate  $resolveGate
+     * @param  Closure(): UserResolver  $resolveUsers
      * @param  class-string<Permission>  $permissionEnum
      */
     public function __construct(
         private readonly Closure $resolveGate,
+        private readonly Closure $resolveUsers,
         private readonly string $permissionEnum,
     ) {
     }
@@ -51,6 +55,14 @@ final class TemplateAuthorization
     public function cannot(Permission|string $permission, ?object $resource = null): bool
     {
         return ! $this->can($permission, $resource);
+    }
+
+    /**
+     * The signed-in user, or null for a guest.
+     */
+    public function currentUser(): ?User
+    {
+        return ($this->users ??= ($this->resolveUsers)())->current();
     }
 
     private function permission(Permission|string $permission): Permission

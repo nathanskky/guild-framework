@@ -340,8 +340,8 @@ the policy is used, for every user.
 
 ### Templates
 
-With both a template engine and authorization configured, in either order, templates get `can()` and
-`cannot()`. A permission can be named by its stored value:
+With both a template engine and authorization configured, in either order, templates get `can()`,
+`cannot()` and `current_user()`. A permission can be named by its stored value:
 
 ```twig
 {% if can('documents.update', document) %}…{% endif %}
@@ -352,6 +352,16 @@ With both a template engine and authorization configured, in either order, templ
 ```
 
 An unknown value throws `ConfigurationException` when the template renders.
+
+`current_user()` returns the signed-in `User`, or `null` for a guest:
+
+```twig
+{% if current_user() %}Signed in as {{ current_user().username }}{% endif %}
+```
+
+```latte
+{if current_user()}Signed in as {current_user()->username()}{/if}
+```
 
 ### Failures
 
