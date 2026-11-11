@@ -22,6 +22,8 @@ abstract class GroupDirectoryContract extends TestCase
 
     private const string UNKNOWN = 'contract-unknown';
 
+    private const string OTHER = 'contract-other';
+
     private const string IDENTIFIER = 'iu:roles:sys:acm:contract-editors';
 
     private const string LABEL = 'Contract Editors';
@@ -58,6 +60,15 @@ abstract class GroupDirectoryContract extends TestCase
         self::assertCount(1, $result->groups, 'exactly the one group');
         self::assertSame(self::IDENTIFIER, $result->groups[0]->identifier, 'grants match on the Grouper system name');
         self::assertSame(self::LABEL, $result->groups[0]->displayExtension, 'the System Admin check matches on the ACM label');
+    }
+
+    public function testAnotherUserIsNotInTheGroup(): void
+    {
+        $result = $this->directoryWhere(self::MEMBER, self::IDENTIFIER, self::LABEL)->groupsFor(self::OTHER);
+
+        self::assertInstanceOf(GroupMembership::class, $result, 'someone outside the group still gets an answer');
+        self::assertSame(self::OTHER, $result->username, 'about themselves');
+        self::assertSame([], $result->groups, 'and one user\'s groups are never handed to another');
     }
 
     public function testAnOutageIsUnavailableWithAReason(): void
