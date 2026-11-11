@@ -21,6 +21,10 @@ use Psr\Log\LoggerInterface;
  * configuration, that is IuLoginSignIn and the guild/access services behind
  * it; given a claim, it is whichever class an extension chose, and nothing
  * from guild/access.
+ *
+ * Only ApplicationBuilder constructs it.
+ *
+ * @internal
  */
 class AuthenticationServiceProvider extends AbstractServiceProvider
 {

@@ -12,6 +12,7 @@ standalone**.
 - **PHP:** `~8.5.0`
 - **Remote:** `git@github.com:nathanskky/guild-framework.git` (SSH), or
   `https://github.com/nathanskky/guild-framework.git` if you don't have SSH keys set up
+- **Current release:** `2.0.0`
 - **Default branch:** `develop`. **Work targets `develop`** — see
   [Branching and pull requests](#branching-and-pull-requests).
 - **`composer.lock` is gitignored** here, so there is no lock to keep in sync.
@@ -97,6 +98,24 @@ The framework wires several third-party libraries into one application container
 - **`monolog/monolog`** — the default `Psr\Log\LoggerInterface` binding
 - **`guild/rivet`** — IU Rivet Design System components for both engines
 
+### Source layout
+
+Namespaces under `src/`, all below `Guild\Framework\`:
+
+- `Admin` — the administration pages' helpers: layout, forms, CSRF, flash messages
+- `Authentication` — `SignInMethod`, its IU Login implementation `IuLoginSignIn`, and `SignOutForm`
+- `Authorization` — `Gate`, `User`, `UserResolver`, policies, grants, and `Identity` / `IdentityReader`
+- `Authorization\Membership` — `GroupDirectory`, its Grouper-backed implementation, and the cached membership
+- `Controller` — the administration pages' controllers (`Authorization`) and sign-out (`Authentication`)
+- `Exception` — `ConfigurationException` and the authorization exceptions
+- `Extension` — `ApplicationExtension`, `ExtensionDiscovery`, and the slot claims extensions make
+- `Middleware` — `RequireSignIn`, `RequireSystemAdmin`, `VerifyCsrfToken`, `AuthorizationFailureResponder`
+- `Model` — the Eloquent models behind the authorization tables
+- `ServiceProvider` — one provider per `add*()` concern
+- `Session` — `SessionStore` and its native implementation
+- `Testing` — `ArraySessionStore` and `GroupDirectoryContract`, for tests of applications and extensions
+- `Twig`, `Latte`, `Rivet` — template functions per engine, and the navigation adapter for Rivet
+
 ### Bootstrap flow
 
 Everything starts from `Application::configure($basePath)`, which returns an `ApplicationBuilder`. The
@@ -115,17 +134,6 @@ Application::configure($basePath)
     ->create()
     ->run();
 ```
-
-**Extensions run before the application's own calls.** `Application::configure($basePath, ?array $extensions = null)`
-takes a list of `Extension\ApplicationExtension`s, or with `null` discovers them: `Extension\ExtensionDiscovery`
-finds the installed Composer packages of type `guild-extension` and builds the class each names in
-`extra.guild.extension` of its `composer.json`. Before returning the builder, it calls each extension's
-`configure($builder)`, in package name order. An extension may choose a slot with `useSignInMethod()`,
-`useGroupDirectory()` or `useSystemAdminGroup()`; the `@internal` `Extension\ClaimedSlots`, held on
-`Application`, records each choice and who made it, and a second choice of the same slot throws
-`ConfigurationException` naming both. `create()` logs each takeover notice at `notice`, then calls each
-extension's `boot($app)`; both happen on the first `create()` only. A `--no-dev` install leaves out dev
-packages, so an extension required with `require-dev` never runs in production.
 
 - `addRouting()` requires `{basePath}/routes/routes.php`, which must return a `callable` receiving the
   `Router` instance. **This is the consuming app's routes file, not this repo's `routes/`** — see Landmines.
@@ -164,33 +172,35 @@ packages, so an extension required with `require-dev` never runs in production.
   the enum directly rather than reading a config file — there is no `config/view.php`.** Both engines load
   templates from `{basePath}/templates` by convention. `View::render()` dispatches to `Environment::render()` or
   `Engine::renderToString()` depending on which engine is bound.
-- `addAuthorization(IdentitySource $identitySource, string $permissions, array $policies = [], ?AdminMenu $adminMenu = new AdminMenu())` requires
-  `{basePath}/config/authorization.php`, which must return an `AuthorizationConfiguration` (the System
-  Admin group's ACM label, the membership TTL and stale cap), and `{basePath}/config/grouper.php` (unless an
-  installed extension chose the group directory), which must return a `GrouperDirectoryConfiguration`
-  (Grouper connection settings and timeouts). `config/grouper.php` is read first and checked with
-  `is_file()`, so an application that has not created it gets a `ConfigurationException` telling it to move
-  its `GrouperConfiguration` there rather than a fatal `require` error. When an extension has chosen the
-  group directory (`useGroupDirectory()`), the file is not read, a takeover notice is logged, `GroupDirectory`
-  resolves to the chosen class, and no `GrouperClient` is bound; the group pages then answer 503 on the
-  three register actions, because registering checks a name in Grouper, while editing, mapping and
-  unregistering still work. The System Admin label may be blank in `config/authorization.php` only when an
-  extension chose it (`useSystemAdminGroup()`); the builder trims either label, uses the chosen one, logs a
-  takeover notice, and otherwise throws `ConfigurationException`. It is the only `add*()` method that takes arguments **and** reads config
-  files, and the split is deliberate: **arguments carry code-level facts** — the identity source and the
-  application's `Permission` enum class, which PHPStan and an IDE can check — **the config file carries
-  everything that varies by deployment**, with the Grouper secret in `config/grouper.php`. With
-  `IdentitySource::Oidc` it **must be called after `addAuthentication()`** and throws `ConfigurationException` otherwise; a CAS application never calls
-  `addAuthentication()`, because Apache authenticates before PHP runs. It registers
+- `addAuthorization(IdentitySource $identitySource, string $permissions, array $policies = [],
+  ?AdminMenu $adminMenu = new AdminMenu())` requires `{basePath}/config/authorization.php`, which must return
+  an `AuthorizationConfiguration` (the System Admin group's ACM label, the membership TTL and stale cap), and
+  `{basePath}/config/grouper.php` (unless an installed extension chose the group directory), which must
+  return a `GrouperDirectoryConfiguration` (Grouper connection settings and timeouts). `config/grouper.php`
+  is read first and checked with `is_file()`, so an application that has not created it gets a
+  `ConfigurationException` telling it to move its `GrouperConfiguration` there rather than a fatal `require`
+  error. When an extension has chosen the group directory (`useGroupDirectory()`), the file is not read, a
+  takeover notice is logged, `GroupDirectory` resolves to the chosen class, and no `GrouperClient` is bound;
+  the group pages then answer 503 on the three register actions, because registering checks a name in
+  Grouper, while editing, mapping and unregistering still work. The System Admin label may be blank in
+  `config/authorization.php` only when an extension chose it (`useSystemAdminGroup()`). The chosen label wins
+  over the configured one and a takeover notice is logged; with neither, `ConfigurationException` is thrown.
+  `AuthorizationConfiguration` trims the configured label, and `useSystemAdminGroup()` trims the chosen one.
+  It is the only `add*()` method that takes arguments **and** reads config files, and the split is
+  deliberate: **arguments carry code-level facts** — the identity source and the application's `Permission`
+  enum class, which PHPStan and an IDE can check — **the config file carries everything that varies by
+  deployment**, with the Grouper secret in `config/grouper.php`. With `IdentitySource::Oidc` it **must be
+  called after `addAuthentication()`** and throws `ConfigurationException` otherwise; a CAS application never
+  calls `addAuthentication()`, because Apache authenticates before PHP runs. It registers
   `AuthorizationServiceProvider`, which lazily binds `UserResolver`, `Gate` and what they need.
   `$policies` is a flat list of policy classes, each declaring `#[HandlesResource]`; they are read and
   validated on first use, never at boot, and resolved through the container. **Templates get `can()`,
   `cannot()` and `current_user()`** whenever a template engine is configured too — `addAuthorization()` and
   `addTemplateEngine()` may be called in either order; whichever runs second registers the eager
   `AuthorizationTemplateServiceProvider`. `sign_out_form()` comes from `addAuthentication()` instead, by the
-  same rule, through `AuthenticationTemplateServiceProvider`. **With `addRivet()`, System Admin group members see an
-  administration menu** in `rvt_page`'s header; `$adminMenu` sets its label and position, and `null` opts
-  out. The grant lookup resolves the shared `Capsule`, so `addIlluminateDatabase()` must also have been
+  same rule, through `AuthenticationTemplateServiceProvider`. **With `addRivet()`, System Admin group members
+  see an administration menu** in `rvt_page`'s header; `$adminMenu` sets its label and position, and `null`
+  opts out. The grant lookup resolves the shared `Capsule`, so `addIlluminateDatabase()` must also have been
   called.
 - `withLogger(LoggerInterface $logger)` replaces the default logger (see below).
 - **Config failures are wrapped** in `Guild\Framework\Exception\ConfigurationException` (a `LogicException`)
@@ -210,6 +220,17 @@ packages, so an extension required with `require-dev` never runs in production.
   is not callable, the `is_callable()` guard means **no routes are registered and no error is raised** —
   every request 404s with nothing to explain why. If you are adding a config-driven `add*` method, follow
   the wrapping pattern of the other three rather than `addRouting()`.
+
+**Extensions run before the application's own calls.**
+`Application::configure($basePath, ?array $extensions = null)` takes a list of
+`Extension\ApplicationExtension`s, or with `null` discovers them: `Extension\ExtensionDiscovery` finds the installed Composer packages of type
+`guild-extension` and builds the class each names in `extra.guild.extension` of its `composer.json`. Before
+returning the builder, it calls each extension's `configure($builder)`, in package name order. An extension
+may choose a slot with `useSignInMethod()`, `useGroupDirectory()` or `useSystemAdminGroup()`; the `@internal`
+`Extension\ClaimedSlots`, held on `Application`, records each choice and who made it, and a second choice of
+the same slot throws `ConfigurationException` naming both. `create()` logs each takeover notice at `notice`,
+then calls each extension's `boot($app)`; both happen on the first `create()` only. A `--no-dev` install
+leaves out dev packages, so an extension required with `require-dev` never runs in production.
 
 ### Request lifecycle
 
@@ -266,7 +287,8 @@ patterns below are *observed*, not a style guide, and cover only what Pint doesn
 - **Classes that are not public API carry `@internal`** — the admin pages' helpers (`Admin/`), the
   controllers and middleware (`Middleware\RequireSignIn` is the public exception: applications add it to
   their routes), `StatusPage`, `PolicyRegistry`, the membership cache and provider, `GrantRepository`,
-  `AdminNavigation`, `ContainerNavigation`, `TemplateAuthorization`, and `User`'s constructor. Keep that
+  `AdminNavigation`, `ContainerNavigation`, `TemplateAuthorization`, `AuthenticationServiceProvider` and
+  `AuthorizationServiceProvider` (only `ApplicationBuilder` constructs them), and `User`'s constructor. Keep that
   marker on anything an application should not construct or type against.
 - **PHPStan level is 10 here.** Levels differ per package (`access` at `max`, `notification` at 5, `starter`
   has none). Do not assume one bar across the workspace.

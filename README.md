@@ -41,7 +41,7 @@ application's own `composer.json`, so declare this package's VCS-hosted dependen
         { "type": "vcs", "url": "https://github.com/nathanskky/guild-rivet.git" }
     ],
     "require": {
-        "guild/framework": "^1.0"
+        "guild/framework": "^2.0"
     }
 }
 ```
@@ -79,10 +79,10 @@ needs only the files for what it enables:
 |---|---|---|
 | `addRouting()` | `routes/routes.php` | |
 | `addIlluminateDatabase()` | `config/database.php` | |
-| `addAuthentication()` | `config/authentication.php` | |
+| `addAuthentication()` | `config/authentication.php` | Not read when an installed extension chose the sign-in method |
 | `addTemplateEngine(TemplateEngine)` | nothing | Renders from `templates/` |
 | `addRivet(?PageDefaults)` | nothing | Call after `addTemplateEngine()` |
-| `addAuthorization(...)` | `config/authorization.php`, `config/grouper.php` | Needs `addIlluminateDatabase()`; with OIDC, call after `addAuthentication()` |
+| `addAuthorization(...)` | `config/authorization.php`, `config/grouper.php` | `config/grouper.php` is not read when an installed extension chose the group directory. Needs `addIlluminateDatabase()`; with OIDC, call after `addAuthentication()` |
 | `enableAutoWiring()` | nothing | |
 | `withLogger(LoggerInterface)` | nothing | |
 
@@ -241,7 +241,7 @@ the application's database and are managed by System Admins in the framework's a
 
    | Field | Default | Description |
    |---|---|---|
-   | `systemAdminGroup` | *(required)* | ACM label of the System Admin group. Members are allowed everything. May be blank only when an installed extension supplies the label; otherwise boot fails. |
+   | `systemAdminGroup` | `null` (blank) | ACM label of the System Admin group. Members are allowed everything. Required unless an installed extension supplies the label; with neither, boot fails. |
    | `membershipTtl` | `900` | Seconds a user's Grouper membership is cached in the session. |
    | `staleCap` | `3600` | Seconds past the TTL cached membership may still be used while Grouper is unreachable. `0` disables. |
 
@@ -385,6 +385,66 @@ administrators register Grouper groups by ACM label, map them to roles, and crea
 and their grants. Under OIDC a guest is asked to sign in; under CAS, protect `/framework` in the Apache
 configuration. With `addRivet()` the pages use the application's `rvt_page` layout, and System Admins see
 a **System settings** menu in its header; pass `adminMenu: null` to leave the header alone.
+
+## Extensions
+
+A `guild-extension` package changes how an application signs people in, where it reads group membership, or
+which group administers it, without the application writing any code for it. Installing the package is
+enough: `Application::configure()` finds it.
+
+A package declares itself in its `composer.json`:
+
+```json
+{
+    "name": "acme/guild-sso",
+    "type": "guild-extension",
+    "extra": {
+        "guild": {
+            "extension": "Acme\\Sso\\SsoExtension"
+        }
+    }
+}
+```
+
+`SsoExtension` implements `Guild\Framework\Extension\ApplicationExtension`. Its `configure()` runs before
+the application's own `add*()` calls and chooses what it supplies through the builder; its `boot()` runs
+at the end of `create()`, once the container is ready:
+
+| Builder method | Chooses | Replaces |
+|---|---|---|
+| `useSignInMethod(class-string<SignInMethod>)` | How people sign in and out | `config/authentication.php` |
+| `useGroupDirectory(class-string<GroupDirectory>)` | Where a user's groups come from | `config/grouper.php` |
+| `useSystemAdminGroup(string)` | The System Admin group's ACM label | `systemAdminGroup` in `config/authorization.php` |
+
+An extension that chose the sign-in method still needs `addAuthentication()`, followed by
+`addAuthorization(IdentitySource::Oidc, ...)`; `IdentitySource::Cas` is refused. Each slot can be chosen
+once, so two extensions choosing the same one fail at boot with a message naming both. Every choice is
+logged at `notice`.
+
+With a chosen group directory there is no Grouper connection, so the three actions that register a group
+by its Grouper name answer 503; editing, mapping and unregistering groups still work.
+
+`Application::configure($basePath, $extensions)` takes an explicit list instead, which is how tests boot
+an application with the extensions they want. A `composer install --no-dev` build never discovers an
+extension that was installed with `require-dev`.
+
+## Upgrading to 2.0
+
+Changes that need action or can break code written against 1.x:
+
+- Grouper settings move from `config/authorization.php` to a new `config/grouper.php`
+- `OidcIdentityReader` is removed; use `SignInMethod`
+- The `AuthenticationServiceProvider` and `AuthorizationServiceProvider` constructors changed (internal wiring)
+- `AuthorizationConfiguration::$systemAdminGroup` is `?string`
+- Under OIDC the administration pages use `RequireSignIn`
+- `addAuthorization()` answers authorization failures for every route
+- After upgrading, sign in and sign out once where the redirect URI is registered with IU Login
+
+The Grouper move is the one every application with `addAuthorization()` hits: `AuthorizationConfiguration`
+no longer takes a `GrouperConfiguration` or Grouper timeouts. Return them from `config/grouper.php` as a
+`GrouperDirectoryConfiguration` instead (see [Setting it up](#setting-it-up)); the error at boot says the
+same. Sign-in and sign-out against IU Login are not covered by automated tests, so confirm them once in an
+environment whose redirect URI is registered.
 
 ## Contributing
 

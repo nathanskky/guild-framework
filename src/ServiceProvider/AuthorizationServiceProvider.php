@@ -46,6 +46,11 @@ use League\Container\ServiceProvider\AbstractServiceProvider;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Binds the authorization services. Only ApplicationBuilder constructs it.
+ *
+ * @internal
+ */
 class AuthorizationServiceProvider extends AbstractServiceProvider
 {
     /**
