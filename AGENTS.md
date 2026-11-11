@@ -154,7 +154,7 @@ Application::configure($basePath)
   error. It is the only `add*()` method that takes arguments **and** reads config files, and the split
   is deliberate: **arguments carry code-level facts** — the identity source and the application's
   `Permission` enum class, which PHPStan and an IDE can check — **the config file carries everything that
-  varies by deployment**, including the Grouper secret. With `IdentitySource::Oidc` it **must be called
+  varies by deployment**, with the Grouper secret in `config/grouper.php`. With `IdentitySource::Oidc` it **must be called
   after `addAuthentication()`** and throws `ConfigurationException` otherwise; a CAS application never calls
   `addAuthentication()`, because Apache authenticates before PHP runs. It registers
   `AuthorizationServiceProvider`, which lazily binds `UserResolver`, `Gate` and what they need.

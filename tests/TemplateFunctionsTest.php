@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Test;
 
+use Guild\Framework\Authorization\Membership\GrouperGroupDirectory;
 use Guild\Framework\Testing\ArraySessionStore;
 use Guild\Framework\Authorization\Gate;
 use Guild\Framework\Authorization\GrantRepository;
@@ -54,6 +55,7 @@ use Twig\Loader\ArrayLoader;
 #[UsesClass(MembershipCache::class)]
 #[UsesClass(ArraySessionStore::class)]
 #[UsesClass(GrantRepository::class)]
+#[UsesClass(GrouperGroupDirectory::class)]
 final class TemplateFunctionsTest extends TestCase
 {
     /**

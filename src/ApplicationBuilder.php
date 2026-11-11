@@ -112,9 +112,18 @@ readonly class ApplicationBuilder
         try {
             $config = require $configFilePath;
         } catch (Error $error) {
+            // $grouper also matches $grouperTimeout and $grouperConnectTimeout;
+            // GrouperConfiguration matches a positional first argument.
+            $grouperLeftBehind = str_contains($error->getMessage(), '$grouper')
+                || str_contains($error->getMessage(), 'GrouperConfiguration');
+
             throw new ConfigurationException(
                 'Problem encountered while attempting to read authorization config file: '
-                . $error->getMessage(),
+                . $error->getMessage()
+                . ($grouperLeftBehind
+                    ? '. Grouper settings are read from config/grouper.php; remove grouper:, grouperTimeout: '
+                        . 'and grouperConnectTimeout: from config/authorization.php.'
+                    : ''),
                 previous: $error,
             );
         }

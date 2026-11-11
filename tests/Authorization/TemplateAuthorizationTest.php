@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Test\Authorization;
 
+use Guild\Framework\Testing\ArraySessionStore;
+use Guild\Framework\Authorization\Membership\GrouperGroupDirectory;
 use Guild\Framework\Authorization\Gate;
 use Guild\Framework\Authorization\GrantRepository;
 use Guild\Framework\Authorization\Handles;
@@ -36,6 +38,8 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(MembershipProvider::class)]
 #[UsesClass(MembershipCache::class)]
 #[UsesClass(GrantRepository::class)]
+#[UsesClass(GrouperGroupDirectory::class)]
+#[UsesClass(ArraySessionStore::class)]
 final class TemplateAuthorizationTest extends TestCase
 {
     public function testAPermissionCanBeNamedByCaseOrByValue(): void

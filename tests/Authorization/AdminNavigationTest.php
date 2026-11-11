@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Test\Authorization;
 
+use Guild\Framework\Authorization\Membership\GrouperGroupDirectory;
 use Guild\Framework\Testing\ArraySessionStore;
 use Guild\Framework\Authorization\AdminMenu;
 use Guild\Framework\Authorization\AdminNavigation;
@@ -37,6 +38,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(MembershipCache::class)]
 #[UsesClass(MembershipProvider::class)]
 #[UsesClass(ArraySessionStore::class)]
+#[UsesClass(GrouperGroupDirectory::class)]
 final class AdminNavigationTest extends TestCase
 {
     public function testASystemAdminSeesTheMenuLastByDefault(): void

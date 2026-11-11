@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Test;
 
+use Guild\Framework\Authorization\Membership\GrouperGroupDirectory;
 use Guild\Framework\Application;
 use Guild\Framework\ApplicationBuilder;
 use Guild\Framework\Authorization\AdminMenu;
@@ -69,6 +70,7 @@ use Psr\Log\NullLogger;
 #[UsesClass(GrantRepository::class)]
 #[UsesClass(Gate::class)]
 #[UsesClass(PolicyRegistry::class)]
+#[UsesClass(GrouperGroupDirectory::class)]
 final class ApplicationBuilderAuthorizationTest extends TestCase
 {
     private string $basePath;
@@ -262,6 +264,21 @@ final class ApplicationBuilderAuthorizationTest extends TestCase
 
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessageMatches('/move the GrouperConfiguration out of config\/authorization\.php/');
+
+        Application::configure($this->basePath)->addAuthorization(IdentitySource::Cas, TestPermission::class);
+    }
+
+    public function testAHalfMigratedAuthorizationConfigSaysWhereGrouperSettingsBelong(): void
+    {
+        $this->writeConfig('authorization.php', <<<'PHP'
+            return new Guild\Framework\Authorization\AuthorizationConfiguration(
+                grouper: new Guild\Grouper\GrouperConfiguration('https://grouper.example.edu/ws', 'svc', 'secret'),
+                systemAdminGroup: 'My App Admins',
+            );
+            PHP);
+
+        $this->expectException(ConfigurationException::class);
+        $this->expectExceptionMessageMatches('/remove grouper:.*from config\/authorization\.php/s');
 
         Application::configure($this->basePath)->addAuthorization(IdentitySource::Cas, TestPermission::class);
     }

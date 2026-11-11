@@ -11,8 +11,10 @@ use Guild\Grouper\Exception\GrouperConfigurationException;
 use Guild\Grouper\Testing\FakeGrouper;
 use Override;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(GrouperGroupDirectory::class)]
+#[UsesClass(GroupDirectoryContract::class)]
 final class GrouperGroupDirectoryTest extends GroupDirectoryContract
 {
     public function testRejectedCredentialsAreThrownNotReportedAsAnOutage(): void
