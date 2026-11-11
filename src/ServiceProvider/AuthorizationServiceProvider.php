@@ -26,11 +26,13 @@ use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
 use Guild\Framework\Authorization\Permission;
 use Guild\Framework\Authorization\Policy\PolicyRegistry;
+use Guild\Framework\Authorization\StatusPage;
 use Guild\Framework\Authorization\UserResolver;
 use Guild\Framework\Controller\Authorization\GroupController;
 use Guild\Framework\Controller\Authorization\OverviewController;
 use Guild\Framework\Controller\Authorization\RoleController;
 use Guild\Framework\Exception\ConfigurationException;
+use Guild\Framework\Middleware\AuthorizationFailureResponder;
 use Guild\Framework\Middleware\RequireSystemAdmin;
 use Guild\Framework\Middleware\VerifyCsrfToken;
 use Guild\Framework\Rivet\ContainerNavigation;
@@ -67,6 +69,8 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
     {
         $services = [
             AdminPage::class,
+            StatusPage::class,
+            AuthorizationFailureResponder::class,
             Csrf::class,
             Flash::class,
             PermissionCatalog::class,
@@ -198,6 +202,7 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
             return new Gate($users, $policies, $permissionEnum);
         });
 
+        $this->registerFailureResponses($container);
         $this->registerAdministration($container, $permissionEnum);
 
         $adminMenu = $this->adminMenu;
@@ -212,6 +217,47 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
                 return new AdminNavigation($users, $adminMenu, $request);
             });
         }
+    }
+
+    /**
+     * The responses to authorization failures: the status page, in the
+     * application's layout when Rivet was added, and the middleware that turns
+     * a route's authorization exceptions into them. A sign-in method exists
+     * only under OIDC; under CAS a guest has nowhere to be sent.
+     */
+    private function registerFailureResponses(DefinitionContainerInterface $container): void
+    {
+        $identitySource = $this->identitySource;
+
+        $container->addShared(StatusPage::class, static fn (): StatusPage => new StatusPage(
+            static function () use ($container): ?Renderer {
+                if (! $container instanceof Application || ! $container->isRivetAdded()) {
+                    return null;
+                }
+
+                $renderer = $container->get(Renderer::class);
+
+                if (! $renderer instanceof Renderer) {
+                    throw new ConfigurationException('The container did not return a Rivet Renderer.');
+                }
+
+                return $renderer;
+            },
+        ));
+
+        $container->addShared(AuthorizationFailureResponder::class, static function () use ($container, $identitySource): AuthorizationFailureResponder {
+            /** @var StatusPage $page */
+            $page = $container->get(StatusPage::class);
+
+            if ($identitySource !== IdentitySource::Oidc) {
+                return new AuthorizationFailureResponder($page, null);
+            }
+
+            /** @var SignInMethod $signIn */
+            $signIn = $container->get(SignInMethod::class);
+
+            return new AuthorizationFailureResponder($page, $signIn);
+        });
     }
 
     /**

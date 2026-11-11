@@ -338,11 +338,15 @@ An unknown value throws `ConfigurationException` when the template renders.
 
 ### Failures
 
-| Exception | Meaning | Typical response |
+| Exception | Meaning | Response |
 |---|---|---|
-| `Exception\AuthorizationException` | `Gate::authorize()` denied an authenticated user | 403 |
-| `Exception\AuthenticationRequiredException` | `Gate::authorize()` denied a guest; extends `AuthorizationException` | Redirect to login, or 403 |
-| `Exception\AuthorizationUnavailableException` | Grouper is unreachable and no cached membership is recent enough | 503 |
+| `Exception\AuthorizationException` | `Gate::authorize()` denied an authenticated user | 403 "Not authorized" |
+| `Exception\AuthenticationRequiredException` | `Gate::authorize()` denied a guest; extends `AuthorizationException` | The sign-in method's challenge under OIDC; 403 "Sign in required" under CAS |
+| `Exception\AuthorizationUnavailableException` | Grouper is unreachable and no cached membership is recent enough | 503 "Temporarily unavailable" |
+
+`addAuthorization()` produces these responses for every route, the application's own included. A guest
+under OIDC gets the sign-in method's challenge. The pages use the application's `rvt_page` layout with
+`addRivet()`, and a plain HTML5 document without it.
 
 `View::render()` rethrows `AuthorizationUnavailableException` raised inside a template unwrapped, under
 both engines. The System Admin check never uses stale membership.

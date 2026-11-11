@@ -12,6 +12,7 @@ use Guild\Framework\Authorization\IdentitySource;
 use Guild\Framework\Authorization\Membership\GrouperDirectoryConfiguration;
 use Guild\Framework\Authorization\Permission;
 use Guild\Framework\Exception\ConfigurationException;
+use Guild\Framework\Middleware\AuthorizationFailureResponder;
 use Guild\Framework\Middleware\RequireSignIn;
 use Guild\Framework\Middleware\RequireSystemAdmin;
 use Guild\Framework\Middleware\VerifyCsrfToken;
@@ -144,6 +145,7 @@ readonly class ApplicationBuilder
         ));
         $this->app->setAuthorizationPermissions($permissions);
         $this->registerAuthorizationRoutes($identitySource);
+        $this->registerAuthorizationFailureResponses();
 
         $engine = $this->app->getTemplateEngine();
 
@@ -215,6 +217,21 @@ readonly class ApplicationBuilder
 
         $group->lazyMiddleware(RequireSystemAdmin::class);
         $group->lazyMiddleware(VerifyCsrfToken::class);
+    }
+
+    /**
+     * Answer the authorization exceptions any route throws, the application's
+     * own included, with a sign-in challenge, a 403 or a 503.
+     */
+    private function registerAuthorizationFailureResponses(): void
+    {
+        $router = $this->app->get(Router::class);
+
+        if (! $router instanceof Router) {
+            throw new ConfigurationException('The container did not return a Router.');
+        }
+
+        $router->lazyMiddleware(AuthorizationFailureResponder::class);
     }
 
     /**

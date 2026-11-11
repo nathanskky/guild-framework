@@ -89,6 +89,7 @@ trait DispatchesAdministration
      * @param  (callable(GrantsDatabase): void)|null  $seed
      * @param  array<string, mixed>|null  $form  a POST body; the session's CSRF token is added unless $csrf is false
      * @param  SignInMethod|null  $signIn  builds an OIDC application whose sign-in method is this one
+     * @param  (callable(Router): void)|null  $routes  adds routes of the test's own before dispatch
      * @return array{ResponseInterface, GrantsDatabase}
      */
     private function dispatch(
@@ -101,6 +102,7 @@ trait DispatchesAdministration
         ?array $form = null,
         bool $csrf = true,
         ?SignInMethod $signIn = null,
+        ?callable $routes = null,
     ): array {
         $builder = Application::configure($this->basePath)->withLogger(new NullLogger())->addIlluminateDatabase();
 
@@ -159,6 +161,10 @@ trait DispatchesAdministration
 
         $router = $app->get(Router::class);
         self::assertInstanceOf(Router::class, $router);
+
+        if ($routes !== null) {
+            $routes($router);
+        }
 
         return [$router->dispatch($request), $db];
     }

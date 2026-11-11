@@ -237,7 +237,8 @@ patterns below are *observed*, not a style guide, and cover only what Pint doesn
 - Directory names under `src/` are **singular**: `Controller`, `Model`, `Exception`, `ServiceProvider`,
   `Middleware`.
 - **Classes that are not public API carry `@internal`** — the admin pages' helpers (`Admin/`), the
-  controllers and middleware, `PolicyRegistry`, the membership cache and provider, `GrantRepository`,
+  controllers and middleware (`Middleware\RequireSignIn` is the public exception: applications add it to
+  their routes), `StatusPage`, `PolicyRegistry`, the membership cache and provider, `GrantRepository`,
   `AdminNavigation`, `ContainerNavigation`, `TemplateAuthorization`, and `User`'s constructor. Keep that
   marker on anything an application should not construct or type against.
 - **PHPStan level is 10 here.** Levels differ per package (`access` at `max`, `notification` at 5, `starter`
