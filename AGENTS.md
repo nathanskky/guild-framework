@@ -93,7 +93,7 @@ The framework wires several third-party libraries into one application container
 - **`robmorgan/phinx`** — migrations
 - **`guild/access`** — OIDC authentication primitives
 - **`guild/grouper`** — read-only Grouper group-membership lookup, for the authorization layer
-- **`guzzlehttp/guzzle`** — the HTTP client handed to `GrouperClient`, with the configured Grouper timeouts
+- **`guzzlehttp/guzzle`** — the HTTP client handed to `GrouperClient`, with the timeouts from `config/grouper.php`
 - **`monolog/monolog`** — the default `Psr\Log\LoggerInterface` binding
 - **`guild/rivet`** — IU Rivet Design System components for both engines
 
@@ -146,9 +146,12 @@ Application::configure($basePath)
   templates from `{basePath}/templates` by convention. `View::render()` dispatches to `Environment::render()` or
   `Engine::renderToString()` depending on which engine is bound.
 - `addAuthorization(IdentitySource $identitySource, string $permissions, array $policies = [], ?AdminMenu $adminMenu = new AdminMenu())` requires
-  `{basePath}/config/authorization.php`, which must return an `AuthorizationConfiguration` (Grouper
-  connection settings, the System Admin group's ACM label, the membership TTL and stale cap, Grouper
-  timeouts). It is the only `add*()` method that takes arguments **and** reads a config file, and the split
+  `{basePath}/config/authorization.php`, which must return an `AuthorizationConfiguration` (the System
+  Admin group's ACM label, the membership TTL and stale cap), and `{basePath}/config/grouper.php`, which
+  must return a `GrouperDirectoryConfiguration` (Grouper connection settings and timeouts). `config/grouper.php`
+  is read first and checked with `is_file()`, so an application that has not created it gets a
+  `ConfigurationException` telling it to move its `GrouperConfiguration` there rather than a fatal `require`
+  error. It is the only `add*()` method that takes arguments **and** reads config files, and the split
   is deliberate: **arguments carry code-level facts** — the identity source and the application's
   `Permission` enum class, which PHPStan and an IDE can check — **the config file carries everything that
   varies by deployment**, including the Grouper secret. With `IdentitySource::Oidc` it **must be called
@@ -166,8 +169,8 @@ Application::configure($basePath)
 - `withLogger(LoggerInterface $logger)` replaces the default logger (see below).
 - **Config failures are wrapped** in `Guild\Framework\Exception\ConfigurationException` (a `LogicException`)
   by `addAuthentication()`, `addIlluminateDatabase()` and `addAuthorization()`, rather than letting the
-  underlying parse/type error — or, for authorization, a `GrouperConfigurationException` from constructing
-  `GrouperConfiguration` — propagate raw. `ConfigurationException` covers configuration only.
+  underlying parse/type error — or, for `config/grouper.php`, a `GrouperConfigurationException` from
+  constructing `GrouperConfiguration` — propagate raw. `ConfigurationException` covers configuration only.
   Three runtime types sit alongside it, all `RuntimeException`s:
   `Exception\AuthorizationException` is a denial from `Gate::authorize()` (render as 403);
   `Exception\AuthenticationRequiredException` extends it for a denied guest, so an OIDC app can redirect
@@ -262,12 +265,12 @@ that file:
 | `addIlluminateDatabase()` | `config/database.php` |
 | `addTemplateEngine()` | none — takes the enum directly; renders from `templates/` |
 | `addRivet()` | none — but requires `addTemplateEngine()` to have been called first |
-| `addAuthorization()` | `config/authorization.php` — plus arguments for the code-level facts; with OIDC, requires `addAuthentication()` first |
+| `addAuthorization()` | `config/authorization.php` and `config/grouper.php` — plus arguments for the code-level facts; with OIDC, requires `addAuthentication()` first |
 | `enableAutoWiring()` | none |
 
 `guild/starter` is the worked example: it does not call `addAuthentication()`, and its
-`addAuthorization()` call is committed commented out, so neither `config/authentication.php` nor
-`config/authorization.php` is loaded and the app runs without them. Its `AGENTS.md` lists the steps to turn
+`addAuthorization()` call is committed commented out, so none of `config/authentication.php`,
+`config/authorization.php` and `config/grouper.php` is loaded and the app runs without them. Its `AGENTS.md` lists the steps to turn
 authorization on.
 
 ## Landmines
@@ -344,8 +347,8 @@ authorization on.
   request, so an administrator's change takes effect on the next request.
 - **The framework starts a PHP session on the CAS path.** Nothing else does there — Apache authenticates
   before PHP runs — so `Session\NativeSessionStore`, the default `SessionStore` binding, starts one with
-  the same cookie parameters as `guild/access` the first time the session is read or written. Public pages that never check authorization get no
-  session cookie.
+  the same cookie parameters as `guild/access` the first time the session is read or written. Public pages
+  that never check authorization get no session cookie.
 - **The default logger writes through PHP's `error_log()`.** `Application` binds `LoggerInterface` to a
   Monolog `Logger` on the `framework` channel with an `ErrorLogHandler`, so records land wherever the
   runtime sends PHP errors. In the `php:*-apache` image that is Apache's `ErrorLog`, which is linked to

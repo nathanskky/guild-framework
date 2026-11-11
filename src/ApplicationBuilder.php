@@ -10,6 +10,7 @@ use Guild\Access\Authentication\OIDC\OidcConfiguration;
 use Guild\Framework\Authorization\AdminMenu;
 use Guild\Framework\Authorization\AuthorizationConfiguration;
 use Guild\Framework\Authorization\IdentitySource;
+use Guild\Framework\Authorization\Membership\GrouperDirectoryConfiguration;
 use Guild\Framework\Authorization\Permission;
 use Guild\Framework\Exception\ConfigurationException;
 use Guild\Framework\Middleware\RequireSystemAdmin;
@@ -73,8 +74,8 @@ readonly class ApplicationBuilder
      * Resolve the authenticated user's Grouper groups to roles and permissions,
      * and make the current user available through UserResolver.
      *
-     * Arguments carry code-level facts; config/authorization.php carries the
-     * settings that vary by deployment. With IdentitySource::Oidc this must
+     * Arguments carry code-level facts; config/authorization.php and
+     * config/grouper.php carry the settings that vary by deployment. With IdentitySource::Oidc this must
      * come after addAuthentication(). A CAS application never calls
      * addAuthentication(), because Apache authenticates before PHP runs.
      *
@@ -102,11 +103,15 @@ readonly class ApplicationBuilder
             );
         }
 
+        // Read first: an application upgraded without moving its Grouper settings
+        // otherwise fails on config/authorization.php with a less useful error.
+        $directory = $this->readGrouperDirectoryConfiguration();
+
         $configFilePath = $this->app->getPath('config') . '/authorization.php';
 
         try {
             $config = require $configFilePath;
-        } catch (Error | GrouperConfigurationException $error) {
+        } catch (Error $error) {
             throw new ConfigurationException(
                 'Problem encountered while attempting to read authorization config file: '
                 . $error->getMessage(),
@@ -124,6 +129,7 @@ readonly class ApplicationBuilder
             $identitySource,
             $permissions,
             $config,
+            $directory,
             $policies,
             $adminMenu,
         ));
@@ -137,6 +143,41 @@ readonly class ApplicationBuilder
         }
 
         return $this;
+    }
+
+    /**
+     * Read config/grouper.php: how to reach live Grouper.
+     */
+    private function readGrouperDirectoryConfiguration(): GrouperDirectoryConfiguration
+    {
+        $configFilePath = $this->app->getPath('config') . '/grouper.php';
+
+        // A missing require target is a fatal error that cannot be caught.
+        if (! is_file($configFilePath)) {
+            throw new ConfigurationException(
+                'config/grouper.php was not found. addAuthorization() reads the Grouper connection settings from it: '
+                . 'move the GrouperConfiguration out of config/authorization.php into config/grouper.php, '
+                . 'which must return a GrouperDirectoryConfiguration.'
+            );
+        }
+
+        try {
+            $config = require $configFilePath;
+        } catch (Error | GrouperConfigurationException $error) {
+            throw new ConfigurationException(
+                'Problem encountered while attempting to read grouper config file: '
+                . $error->getMessage(),
+                previous: $error,
+            );
+        }
+
+        if (! $config instanceof GrouperDirectoryConfiguration) {
+            throw new ConfigurationException(
+                'Grouper configuration file must return an instance of GrouperDirectoryConfiguration.'
+            );
+        }
+
+        return $config;
     }
 
     /**

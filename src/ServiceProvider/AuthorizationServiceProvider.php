@@ -21,6 +21,7 @@ use Guild\Framework\Authorization\Identity\OidcIdentityReader;
 use Guild\Framework\Authorization\Identity\RemoteUserIdentityReader;
 use Guild\Framework\Authorization\IdentitySource;
 use Guild\Framework\Authorization\Membership\GroupDirectory;
+use Guild\Framework\Authorization\Membership\GrouperDirectoryConfiguration;
 use Guild\Framework\Authorization\Membership\GrouperGroupDirectory;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
@@ -57,6 +58,7 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
         private readonly IdentitySource $identitySource,
         private readonly string $permissionEnum,
         private readonly AuthorizationConfiguration $config,
+        private readonly GrouperDirectoryConfiguration $directory,
         private readonly array $policies = [],
         private readonly ?AdminMenu $adminMenu = new AdminMenu(),
     ) {
@@ -100,11 +102,13 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
 
         $container->addShared(AuthorizationConfiguration::class, $config);
 
+        $directory = $this->directory;
+
         $container->addShared(GrouperClient::class, static fn (): GrouperClient => new GrouperClient(
-            $config->grouper,
+            $directory->grouper,
             new Client([
-                'timeout' => $config->grouperTimeout,
-                'connect_timeout' => $config->grouperConnectTimeout,
+                'timeout' => $directory->timeout,
+                'connect_timeout' => $directory->connectTimeout,
             ]),
         ));
 

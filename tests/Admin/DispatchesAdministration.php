@@ -41,9 +41,13 @@ trait DispatchesAdministration
         file_put_contents($this->basePath . '/config/authorization.php', <<<'PHP'
             <?php
 
-            return new Guild\Framework\Authorization\AuthorizationConfiguration(
+            return new Guild\Framework\Authorization\AuthorizationConfiguration('My App Admins');
+            PHP);
+        file_put_contents($this->basePath . '/config/grouper.php', <<<'PHP'
+            <?php
+
+            return new Guild\Framework\Authorization\Membership\GrouperDirectoryConfiguration(
                 new Guild\Grouper\GrouperConfiguration('https://grouper.example.edu/ws', 'svc', 'secret'),
-                'My App Admins',
             );
             PHP);
     }

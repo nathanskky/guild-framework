@@ -15,6 +15,7 @@ use Guild\Framework\Authorization\Identity\IdentityReader;
 use Guild\Framework\Authorization\Identity\OidcIdentityReader;
 use Guild\Framework\Authorization\Identity\RemoteUserIdentityReader;
 use Guild\Framework\Authorization\IdentitySource;
+use Guild\Framework\Authorization\Membership\GrouperDirectoryConfiguration;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
 use Guild\Framework\Authorization\Policy\PolicyRegistry;
@@ -59,6 +60,7 @@ use Psr\Log\NullLogger;
 #[UsesClass(LatteAuthorizationExtension::class)]
 #[UsesClass(AuthenticationServiceProvider::class)]
 #[UsesClass(AuthorizationConfiguration::class)]
+#[UsesClass(GrouperDirectoryConfiguration::class)]
 #[UsesClass(UserResolver::class)]
 #[UsesClass(RemoteUserIdentityReader::class)]
 #[UsesClass(OidcIdentityReader::class)]
@@ -86,9 +88,11 @@ final class ApplicationBuilderAuthorizationTest extends TestCase
             );
             PHP);
         $this->writeConfig('authorization.php', <<<'PHP'
-            return new Guild\Framework\Authorization\AuthorizationConfiguration(
+            return new Guild\Framework\Authorization\AuthorizationConfiguration('My App Admins');
+            PHP);
+        $this->writeConfig('grouper.php', <<<'PHP'
+            return new Guild\Framework\Authorization\Membership\GrouperDirectoryConfiguration(
                 new Guild\Grouper\GrouperConfiguration('https://grouper.example.edu/ws', 'svc', 'secret'),
-                'My App Admins',
             );
             PHP);
     }
@@ -224,15 +228,50 @@ final class ApplicationBuilderAuthorizationTest extends TestCase
 
     public function testInvalidGrouperSettingsFailAtStartup(): void
     {
-        $this->writeConfig('authorization.php', <<<'PHP'
-            return new Guild\Framework\Authorization\AuthorizationConfiguration(
+        $this->writeConfig('grouper.php', <<<'PHP'
+            return new Guild\Framework\Authorization\Membership\GrouperDirectoryConfiguration(
                 new Guild\Grouper\GrouperConfiguration('http://grouper.example.edu/ws', 'svc', 'secret'),
-                'My App Admins',
             );
             PHP);
 
         $this->expectException(ConfigurationException::class);
-        $this->expectExceptionMessage('authorization config file');
+        $this->expectExceptionMessage('grouper config file');
+
+        Application::configure($this->basePath)->addAuthorization(IdentitySource::Cas, TestPermission::class);
+    }
+
+    public function testAMissingGrouperConfigFileFailsWithMigrationGuidance(): void
+    {
+        unlink($this->basePath . '/config/grouper.php');
+
+        $this->expectException(ConfigurationException::class);
+        $this->expectExceptionMessageMatches('/config\/grouper\.php.*GrouperDirectoryConfiguration/s');
+
+        Application::configure($this->basePath)->addAuthorization(IdentitySource::Cas, TestPermission::class);
+    }
+
+    public function testAnAuthorizationConfigStillPassingGrouperFailsWithTheSameGuidance(): void
+    {
+        unlink($this->basePath . '/config/grouper.php');
+        $this->writeConfig('authorization.php', <<<'PHP'
+            return new Guild\Framework\Authorization\AuthorizationConfiguration(
+                grouper: new Guild\Grouper\GrouperConfiguration('https://grouper.example.edu/ws', 'svc', 'secret'),
+                systemAdminGroup: 'My App Admins',
+            );
+            PHP);
+
+        $this->expectException(ConfigurationException::class);
+        $this->expectExceptionMessageMatches('/move the GrouperConfiguration out of config\/authorization\.php/');
+
+        Application::configure($this->basePath)->addAuthorization(IdentitySource::Cas, TestPermission::class);
+    }
+
+    public function testAGrouperConfigFileReturningTheWrongTypeThrows(): void
+    {
+        $this->writeConfig('grouper.php', "return ['service_url' => 'https://grouper.example.edu/ws'];");
+
+        $this->expectException(ConfigurationException::class);
+        $this->expectExceptionMessage('must return an instance of GrouperDirectoryConfiguration');
 
         Application::configure($this->basePath)->addAuthorization(IdentitySource::Cas, TestPermission::class);
     }

@@ -82,7 +82,7 @@ needs only the files for what it enables:
 | `addAuthentication()` | `config/authentication.php` | |
 | `addTemplateEngine(TemplateEngine)` | nothing | Renders from `templates/` |
 | `addRivet(?PageDefaults)` | nothing | Call after `addTemplateEngine()` |
-| `addAuthorization(...)` | `config/authorization.php` | Needs `addIlluminateDatabase()`; with OIDC, call after `addAuthentication()` |
+| `addAuthorization(...)` | `config/authorization.php`, `config/grouper.php` | Needs `addIlluminateDatabase()`; with OIDC, call after `addAuthentication()` |
 | `enableAutoWiring()` | nothing | |
 | `withLogger(LoggerInterface)` | nothing | |
 
@@ -205,19 +205,13 @@ the application's database and are managed by System Admins in the framework's a
    }
    ```
 
-2. **Configure the deployment** in `config/authorization.php`, which returns an
+2. **Configure the deployment** in two files. `config/authorization.php` returns an
    `AuthorizationConfiguration`:
 
    ```php
    use Guild\Framework\Authorization\AuthorizationConfiguration;
-   use Guild\Grouper\GrouperConfiguration;
 
    return new AuthorizationConfiguration(
-       grouper: new GrouperConfiguration(
-           serviceUrl: $_ENV['GROUPER_SERVICE_URL'],
-           username:   $_ENV['GROUPER_USERNAME'],
-           password:   $_ENV['GROUPER_PASSWORD'],
-       ),
        // The ACM label of the group whose members administer the application.
        systemAdminGroup: $_ENV['AUTHORIZATION_SYSTEM_ADMIN_GROUP'],
    );
@@ -225,12 +219,30 @@ the application's database and are managed by System Admins in the framework's a
 
    | Field | Default | Description |
    |---|---|---|
-   | `grouper` | *(required)* | A `GrouperConfiguration`; see the [`guild/grouper` README](https://github.com/nathanskky/guild-grouper). |
    | `systemAdminGroup` | *(required)* | ACM label of the System Admin group. Members are allowed everything. |
    | `membershipTtl` | `900` | Seconds a user's Grouper membership is cached in the session. |
    | `staleCap` | `3600` | Seconds past the TTL cached membership may still be used while Grouper is unreachable. `0` disables. |
-   | `grouperTimeout` | `10.0` | Seconds to wait for a Grouper response. |
-   | `grouperConnectTimeout` | `3.0` | Seconds to wait for a connection to Grouper. |
+
+   `config/grouper.php` returns a `GrouperDirectoryConfiguration`, saying how to reach Grouper:
+
+   ```php
+   use Guild\Framework\Authorization\Membership\GrouperDirectoryConfiguration;
+   use Guild\Grouper\GrouperConfiguration;
+
+   return new GrouperDirectoryConfiguration(
+       grouper: new GrouperConfiguration(
+           serviceUrl: $_ENV['GROUPER_SERVICE_URL'],
+           username:   $_ENV['GROUPER_USERNAME'],
+           password:   $_ENV['GROUPER_PASSWORD'],
+       ),
+   );
+   ```
+
+   | Field | Default | Description |
+   |---|---|---|
+   | `grouper` | *(required)* | A `GrouperConfiguration`; see the [`guild/grouper` README](https://github.com/nathanskky/guild-grouper). |
+   | `timeout` | `10.0` | Seconds to wait for a Grouper response. |
+   | `connectTimeout` | `3.0` | Seconds to wait for a connection to Grouper. |
 
 3. **Call `addAuthorization()`**:
 
