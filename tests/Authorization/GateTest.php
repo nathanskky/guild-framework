@@ -39,8 +39,7 @@ use Psr\Log\NullLogger;
 
 /**
  * jdoe is in iu:x-editors, whose role grants documents.update. iu:x-admins
- * carries the System Admin label. Membership is cached in the session, so
- * each test runs in its own process.
+ * carries the System Admin label.
  */
 #[CoversClass(Gate::class)]
 #[UsesClass(PolicyRegistry::class)]

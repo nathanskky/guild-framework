@@ -25,9 +25,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Membership is cached in the session, so each test runs in its own process.
- */
 #[CoversClass(AdminNavigation::class)]
 #[CoversClass(AdminMenu::class)]
 #[UsesClass(User::class)]

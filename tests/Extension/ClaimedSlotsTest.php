@@ -40,25 +40,29 @@ final class ClaimedSlotsTest extends TestCase
         RecordingExtension::$calls = [];
     }
 
-    public function testConfigureRunsEachExtensionBeforeTheApplicationsCalls(): void
+    public function testConfigureConfiguresEachExtensionWithoutBootingIt(): void
     {
-        Application::configure(sys_get_temp_dir(), [new RecordingExtension()]);
+        Application::configure(sys_get_temp_dir(), [new RecordingExtension(), new RecordingExtension()]);
 
         self::assertSame(
-            ['configure'],
+            ['configure', 'configure'],
             RecordingExtension::$calls,
-            'the extension is configured by the time Application::configure() hands back the builder, and not booted',
+            'both extensions are configured by the time Application::configure() hands back the builder, and neither is booted',
         );
     }
 
     public function testCreateBootsEachExtensionOnce(): void
     {
-        $builder = Application::configure(sys_get_temp_dir(), [new RecordingExtension()]);
+        $builder = Application::configure(sys_get_temp_dir(), [new RecordingExtension(), new RecordingExtension()]);
 
         $builder->create();
         $builder->create();
 
-        self::assertSame(['configure', 'boot'], RecordingExtension::$calls, 'a second create() boots nothing again');
+        self::assertSame(
+            ['configure', 'configure', 'boot', 'boot'],
+            RecordingExtension::$calls,
+            'each extension is booted once, and a second create() boots nothing again',
+        );
     }
 
     public function testAClaimRecordsTheExtensionThatMadeIt(): void

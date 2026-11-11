@@ -119,9 +119,11 @@ final class TemplateFunctionsTest extends TestCase
     #[DataProvider('currentUserTemplates')]
     public function testCurrentUserRendersTheSignedInUserInBothEngines(string $engine, string $signedIn, string $guest): void
     {
-        $users = GateFactory::resolver(new FakeGrouper([]), new Identity('jdoe'), new GrantsDatabase());
+        $jdoe = new Identity('jdoe');
+        $gate = GateFactory::make(new FakeGrouper([]), $jdoe, new GrantsDatabase());
+        $users = GateFactory::resolver(new FakeGrouper([]), $jdoe, new GrantsDatabase());
 
-        self::assertSame('jdoe', $this->view($engine, $signedIn, GateFactory::guest(), $users)->render('t'), "{$engine} renders the username");
+        self::assertSame('jdoe', $this->view($engine, $signedIn, $gate, $users)->render('t'), "{$engine} renders the username");
     }
 
     #[DataProvider('currentUserTemplates')]

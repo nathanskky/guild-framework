@@ -25,9 +25,6 @@ use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
-/**
- * Membership is cached in the PHP session, so each test runs in its own process.
- */
 #[CoversClass(User::class)]
 #[CoversClass(UserGroup::class)]
 #[UsesClass(Identity::class)]

@@ -36,6 +36,9 @@ use Psr\Http\Server\RequestHandlerInterface;
 #[PreserveGlobalState(false)]
 final class IuLoginSignInTest extends TestCase
 {
+    /** A local port nothing listens on: discovery is refused at once, without leaving the machine. */
+    private const string UNREACHABLE = 'https://127.0.0.1:1';
+
     private TestHandler $logs;
 
     protected function setUp(): void
@@ -103,6 +106,17 @@ final class IuLoginSignInTest extends TestCase
         self::assertStringNotContainsString('<script>', (string) $response->getBody(), 'the description is not reflected');
     }
 
+    public function testAnUnreachableIdentityProviderIsA401AndAWarning(): void
+    {
+        session_start();
+
+        $response = $this->signIn(providerUrl: self::UNREACHABLE)
+            ->requireSignIn(new ServerRequest(), $this->handler(new TextResponse('unreachable', 200)));
+
+        self::assertSame(401, $response->getStatusCode(), 'a guest who cannot be sent to IU Login is not let through');
+        self::assertTrue($this->logs->hasWarningThatContains('OIDC authentication failed'), 'and the failure is logged for the operator');
+    }
+
     public function testAnExceptionFromTheHandlerIsNotTreatedAsASignInFailure(): void
     {
         $this->login(['username' => 'jdoe']);
@@ -158,13 +172,13 @@ final class IuLoginSignInTest extends TestCase
         $_SESSION['guild_oidc_authenticated_until'] = $expiresAt ?? time() + 3600;
     }
 
-    private function signIn(): IuLoginSignIn
+    private function signIn(string $providerUrl = 'https://idp.login.iu.edu'): IuLoginSignIn
     {
         $logger = new Logger('test', [$this->logs]);
 
         return new IuLoginSignIn(
             new OidcAuthenticationService(
-                new OidcConfiguration('https://idp.login.iu.edu', 'id', 'secret', 'https://app.iu.edu/cb'),
+                new OidcConfiguration($providerUrl, 'id', 'secret', 'https://app.iu.edu/cb'),
                 $logger,
             ),
             new NativeSessionStore(),

@@ -89,14 +89,19 @@ final class SystemAdminSlotTest extends TestCase
     {
         $this->writeAuthorizationConfig("new Guild\\Framework\\Authorization\\AuthorizationConfiguration('My App Admins')");
         $log = new TestHandler();
-        $extension = new ClaimingExtension(
-            directory: $this->directoryWith('My App Admins'),
-            systemAdminGroup: 'Starter Admins',
-        );
+        $admins = new ArrayGroupDirectory([
+            'jdoe' => [new GrouperGroup('iu:x-admins', 'Indiana University:X:Admins', 'My App Admins', 'uuid-1')],
+            'asmith' => [new GrouperGroup('iu:starter-admins', 'Indiana University:Starter:Admins', 'Starter Admins', 'uuid-2')],
+        ]);
+        $extension = new ClaimingExtension(directory: $admins, systemAdminGroup: 'Starter Admins');
 
         $app = $this->bootApp($extension, new Logger('test', [$log]));
 
-        self::assertFalse($this->resolveAdmin($app), 'a member of the configured group is not an admin once the claim replaces it');
+        self::assertFalse($this->resolveAdmin($app), 'jdoe, in the configured group, is not an admin once the claim replaces it');
+        self::assertTrue(
+            $this->resolveAdmin($this->bootApp($extension, username: 'asmith')),
+            'while asmith, in the claimed group, is',
+        );
         self::assertTrue(
             $log->hasRecord(
                 sprintf(
@@ -180,7 +185,7 @@ final class SystemAdminSlotTest extends TestCase
         return new ArrayGroupDirectory(['jdoe' => [new GrouperGroup('iu:x-admins', 'Indiana University:X:Admins', $label, 'uuid-1')]]);
     }
 
-    private function bootApp(ClaimingExtension $extension, Logger|NullLogger $logger = new NullLogger()): Application
+    private function bootApp(ClaimingExtension $extension, Logger|NullLogger $logger = new NullLogger(), string $username = 'jdoe'): Application
     {
         $app = Application::configure($this->basePath, [$extension])
             ->withLogger($logger)
@@ -190,7 +195,7 @@ final class SystemAdminSlotTest extends TestCase
         $app->addShared(SessionStore::class, new ArraySessionStore(), overwrite: true);
         $app->addShared(
             ServerRequestInterface::class,
-            (new ServerRequestFactory())->createServerRequest('GET', '/', ['REMOTE_USER' => 'jdoe']),
+            (new ServerRequestFactory())->createServerRequest('GET', '/', ['REMOTE_USER' => $username]),
             overwrite: true,
         );
 
@@ -207,7 +212,7 @@ final class SystemAdminSlotTest extends TestCase
         $resolver = $app->get(UserResolver::class);
         self::assertInstanceOf(UserResolver::class, $resolver);
         $user = $resolver->current();
-        self::assertInstanceOf(User::class, $user, 'jdoe is signed in');
+        self::assertInstanceOf(User::class, $user, 'the visitor is signed in');
 
         return $user->isSystemAdmin();
     }

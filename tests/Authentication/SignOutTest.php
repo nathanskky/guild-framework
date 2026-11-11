@@ -9,6 +9,7 @@ use Guild\Framework\Admin\Csrf;
 use Guild\Framework\Application;
 use Guild\Framework\ApplicationBuilder;
 use Guild\Framework\Authentication\SignInMethod;
+use Guild\Framework\Authorization\Identity\Identity;
 use Guild\Framework\Controller\Authentication\SignOutController;
 use Guild\Framework\Middleware\VerifyCsrfToken;
 use Guild\Framework\Router;
@@ -39,6 +40,7 @@ use Psr\Log\NullLogger;
 #[UsesClass(AdminPage::class)]
 #[UsesClass(FakeSignIn::class)]
 #[UsesClass(ArraySessionStore::class)]
+#[UsesClass(Identity::class)]
 final class SignOutTest extends TestCase
 {
     private string $basePath;
@@ -65,13 +67,13 @@ final class SignOutTest extends TestCase
 
     public function testPostingTheFormSignsOut(): void
     {
-        $signIn = new FakeSignIn();
+        $signIn = new FakeSignIn(new Identity('jdoe'));
 
         $response = $this->dispatch('POST', ['_csrf' => 't'], $signIn);
 
-        self::assertSame(302, $response->getStatusCode(), 'the visitor is redirected');
+        self::assertSame(302, $response->getStatusCode(), 'jdoe is redirected');
         self::assertSame('/signed-out', $response->getHeaderLine('Location'), 'to where the sign-in method says');
-        self::assertSame(1, $signIn->signOuts, 'after the sign-in method signed them out');
+        self::assertNull($signIn->read(), 'and is no longer signed in');
     }
 
     public function testSigningOutRotatesTheCsrfToken(): void
@@ -85,33 +87,33 @@ final class SignOutTest extends TestCase
 
     public function testAMissingTokenIsRefused(): void
     {
-        $signIn = new FakeSignIn();
+        $signIn = new FakeSignIn(new Identity('jdoe'));
 
         $response = $this->dispatch('POST', [], $signIn);
 
         self::assertSame(403, $response->getStatusCode(), 'a form without the session token is refused');
-        self::assertSame(0, $signIn->signOuts, 'and nobody is signed out');
+        self::assertSame('jdoe', $signIn->read()?->username, 'and jdoe is still signed in');
     }
 
     public function testAWrongTokenIsRefused(): void
     {
-        $signIn = new FakeSignIn();
+        $signIn = new FakeSignIn(new Identity('jdoe'));
 
         $response = $this->dispatch('POST', ['_csrf' => 'other'], $signIn);
 
         self::assertSame(403, $response->getStatusCode(), 'a token from another session is refused');
-        self::assertSame(0, $signIn->signOuts, 'and nobody is signed out');
+        self::assertSame('jdoe', $signIn->read()?->username, 'and jdoe is still signed in');
     }
 
     public function testGetIsNotAllowed(): void
     {
-        $signIn = new FakeSignIn();
+        $signIn = new FakeSignIn(new Identity('jdoe'));
 
         $response = $this->dispatch('GET', null, $signIn);
 
         self::assertSame(405, $response->getStatusCode(), 'a link cannot sign anyone out');
         self::assertSame('POST', $response->getHeaderLine('Allow'), 'only a form can');
-        self::assertSame(0, $signIn->signOuts, 'and nobody is signed out');
+        self::assertSame('jdoe', $signIn->read()?->username, 'and jdoe is still signed in');
     }
 
     /**

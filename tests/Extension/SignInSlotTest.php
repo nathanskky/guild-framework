@@ -9,6 +9,7 @@ use Guild\Framework\Admin\Csrf;
 use Guild\Framework\Application;
 use Guild\Framework\ApplicationBuilder;
 use Guild\Framework\Authentication\SignInMethod;
+use Guild\Framework\Authorization\Identity\Identity;
 use Guild\Framework\Authorization\IdentitySource;
 use Guild\Framework\Controller\Authentication\SignOutController;
 use Guild\Framework\Exception\ConfigurationException;
@@ -49,6 +50,7 @@ use Psr\Log\NullLogger;
 #[UsesClass(VerifyCsrfToken::class)]
 #[UsesClass(AdminPage::class)]
 #[UsesClass(SignOutController::class)]
+#[UsesClass(Identity::class)]
 final class SignInSlotTest extends TestCase
 {
     private string $basePath;
@@ -93,7 +95,7 @@ final class SignInSlotTest extends TestCase
 
     public function testAClaimedSignInMethodStillMountsSignOut(): void
     {
-        $signIn = new FakeSignIn();
+        $signIn = new FakeSignIn(new Identity('jdoe'));
         $app = Application::configure($this->basePath, [new ClaimingExtension(signIn: $signIn)])
             ->withLogger(new NullLogger())
             ->addAuthentication()
@@ -109,7 +111,7 @@ final class SignInSlotTest extends TestCase
 
         self::assertTrue($app->isAuthenticationAdded(), 'authentication counts as added');
         self::assertSame('/signed-out', $response->getHeaderLine('Location'), 'POST /framework/sign-out is mounted');
-        self::assertSame(1, $signIn->signOuts, 'and signs out through the claimed sign-in method');
+        self::assertNull($signIn->read(), 'and signs jdoe out through the claimed sign-in method');
     }
 
     public function testTheTakeoverIsLogged(): void

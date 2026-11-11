@@ -86,18 +86,21 @@ final class TemplateAuthorizationTest extends TestCase
     public function testTheUserResolverIsNotResolvedUntilCurrentUserIsCalled(): void
     {
         $resolutions = 0;
+        $db = new GrantsDatabase();
+        $db->map($db->group('iu:x-readers'), $db->role('Reader', ['documents.view']));
+        $jdoe = new Identity('jdoe');
         $authorization = new TemplateAuthorization(
-            GateFactory::guest(...),
-            static function () use (&$resolutions): UserResolver {
+            static fn (): Gate => GateFactory::make(new FakeGrouper([FakeGrouper::membership(['iu:x-readers' => 'X Readers'])]), $jdoe, $db),
+            static function () use (&$resolutions, $jdoe, $db): UserResolver {
                 $resolutions++;
 
-                return GateFactory::resolver(new FakeGrouper([]), new Identity('jdoe'), new GrantsDatabase());
+                return GateFactory::resolver(new FakeGrouper([]), $jdoe, $db);
             },
             TestPermission::class,
         );
 
         self::assertSame(0, $resolutions, 'a page that never asks for the user costs nothing');
-        self::assertTrue($authorization->can('documents.view', new Document('jdoe', public: true)), 'can() does not resolve it');
+        self::assertTrue($authorization->can('documents.view', new Document('asmith', public: true)), 'can() answers for jdoe, a reader, without it');
         self::assertSame(0, $resolutions, 'checking a permission leaves the resolver alone');
 
         self::assertSame('jdoe', $authorization->currentUser()?->username(), 'the signed-in user');

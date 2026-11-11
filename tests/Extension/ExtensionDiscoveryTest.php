@@ -63,13 +63,27 @@ final class ExtensionDiscoveryTest extends TestCase
 
     public function testADevExtensionIsSkippedWhenDevPackagesAreNotInstalled(): void
     {
-        $missing = $this->root . '/not-autoloaded';
+        $path = $this->package(['extra' => ['guild' => ['extension' => 'Acme\DevTools\NotAutoloadedExtension']]]);
 
         $discovery = ExtensionDiscovery::fromInstalledData([
-            self::dataset(dev: false, versions: ['acme/dev-tools' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $missing, devRequirement: true)]),
+            self::dataset(dev: false, versions: ['acme/dev-tools' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $path, devRequirement: true)]),
         ]);
 
-        self::assertSame([], $discovery->extensions(), 'after dump-autoload --no-dev the package is listed but its classes are not loadable');
+        self::assertSame([], $discovery->extensions(), 'after dump-autoload --no-dev the package is still on disk, but its class is not loadable');
+    }
+
+    public function testTheSameUnloadableExtensionFailsWhenDevPackagesAreInstalled(): void
+    {
+        $path = $this->package(['extra' => ['guild' => ['extension' => 'Acme\DevTools\NotAutoloadedExtension']]]);
+
+        $discovery = ExtensionDiscovery::fromInstalledData([
+            self::dataset(dev: true, versions: ['acme/dev-tools' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $path, devRequirement: true)]),
+        ]);
+
+        $this->expectException(ConfigurationException::class);
+        $this->expectExceptionMessage('names Acme\DevTools\NotAutoloadedExtension as its extension, but that class does not exist.');
+
+        $discovery->extensions();
     }
 
     public function testADevExtensionIsFoundWhenDevPackagesAreInstalled(): void
