@@ -454,6 +454,11 @@ an application with the extensions they want. A `composer install --no-dev` buil
 extension that was installed with `require-dev`, and neither does `composer dump-autoload --no-dev` run over a
 development install.
 
+## Upgrading to 2.1
+
+Run the framework's migrations (see [Setting it up](#setting-it-up)): 2.1 widens the `created_by` and
+`updated_by` columns to 64 characters. Nothing else needs action.
+
 ## Upgrading to 2.0
 
 Changes that need action or can break code written against 1.x:
