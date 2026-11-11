@@ -13,6 +13,8 @@ use Latte\Runtime\Html;
  * form, as markup:
  *
  *     {sign_out_form()}
+ *
+ * @internal Built only from the internal SignOutForm.
  */
 final class AuthenticationExtension extends Extension
 {

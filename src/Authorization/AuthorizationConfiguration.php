@@ -13,6 +13,10 @@ use Guild\Framework\Exception\ConfigurationException;
  * Everything here varies between environments. Code-level facts (the
  * identity source, the permission enum) are addAuthorization() arguments
  * instead, and Grouper connection settings are in config/grouper.php.
+ *
+ * $systemAdminGroup is the configured label only. The label in effect is
+ * resolved by addAuthorization() and may come from an installed extension, so
+ * read it from there, not from this object.
  */
 final readonly class AuthorizationConfiguration
 {

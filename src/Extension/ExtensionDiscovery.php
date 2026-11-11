@@ -14,6 +14,8 @@ use JsonException;
  *
  * A --no-dev install leaves out dev packages, so an extension required with
  * require-dev is never discovered in production.
+ *
+ * @internal
  */
 final readonly class ExtensionDiscovery
 {

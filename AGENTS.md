@@ -287,7 +287,8 @@ patterns below are *observed*, not a style guide, and cover only what Pint doesn
 - **Classes that are not public API carry `@internal`** — the admin pages' helpers (`Admin/`), the
   controllers and middleware (`Middleware\RequireSignIn` is the public exception: applications add it to
   their routes), `StatusPage`, `PolicyRegistry`, the membership cache and provider, `GrantRepository`,
-  `AdminNavigation`, `ContainerNavigation`, `TemplateAuthorization`, `AuthenticationServiceProvider` and
+  `AdminNavigation`, `ContainerNavigation`, `TemplateAuthorization`, `Extension\ExtensionDiscovery`, the Twig and
+  Latte `AuthenticationExtension` classes, `AuthenticationServiceProvider` and
   `AuthorizationServiceProvider` (only `ApplicationBuilder` constructs them), and `User`'s constructor. Keep that
   marker on anything an application should not construct or type against.
 - **PHPStan level is 10 here.** Levels differ per package (`access` at `max`, `notification` at 5, `starter`

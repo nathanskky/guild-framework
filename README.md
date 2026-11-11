@@ -138,7 +138,9 @@ use Guild\Framework\Middleware\RequireSignIn;
 $router->lazyMiddleware(RequireSignIn::class);
 ```
 
-`OidcAuthenticationMiddleware` still works, but always uses IU Login.
+`OidcAuthenticationMiddleware` still works, but always uses IU Login. Neither it nor
+`OidcAuthenticationService` is bound when an installed extension chose the sign-in method, so routes
+should use `RequireSignIn`.
 
 See the [`guild/access` README](https://github.com/nathanskky/guild-access) for the configuration fields,
 redirect rules and session handling.
@@ -158,7 +160,8 @@ a form that carries the session's CSRF token, so a link or a `GET` cannot sign a
 {sign_out_form()}
 ```
 
-The visitor lands on IU Login's own logout page.
+With IU Login, the visitor lands on IU Login's logout page, or on `defaultReturnUrl` when there was no
+IU Login session. A sign-in method chosen by an extension decides for itself.
 
 ### `addTemplateEngine()`
 
@@ -375,6 +378,11 @@ An unknown value throws `ConfigurationException` when the template renders.
 under OIDC gets the sign-in method's challenge. The pages use the application's `rvt_page` layout with
 `addRivet()`, and a plain HTML5 document without it.
 
+`AuthorizationFailureResponder` is router-level middleware that `addAuthorization()` adds. Router-level
+middleware runs first-added-outermost, so an application's own router-level exception middleware in
+`routes.php` sees authorization exceptions only when `addRouting()` comes after `addAuthorization()`.
+Route- and group-level middleware always sees them first.
+
 `View::render()` rethrows `AuthorizationUnavailableException` raised inside a template unwrapped, under
 both engines. The System Admin check never uses stale membership.
 
@@ -418,8 +426,8 @@ at the end of `create()`, once the container is ready:
 
 An extension that chose the sign-in method still needs `addAuthentication()`, followed by
 `addAuthorization(IdentitySource::Oidc, ...)`; `IdentitySource::Cas` is refused. Each slot can be chosen
-once, so two extensions choosing the same one fail at boot with a message naming both. Every choice is
-logged at `notice`.
+once, so two extensions choosing the same one fail at boot with a message naming both. Every choice that takes
+effect is logged at `notice`.
 
 With a chosen group directory there is no Grouper connection, so the three actions that register a group
 by its Grouper name answer 503; editing, mapping and unregistering groups still work.
