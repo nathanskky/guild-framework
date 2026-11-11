@@ -4,20 +4,19 @@ declare(strict_types=1);
 
 namespace Guild\Framework\ServiceProvider;
 
-use Guild\Access\Authentication\OIDC\OidcAuthenticationService;
 use Guild\Framework\Admin\Actor;
 use Guild\Framework\Admin\AdminPage;
 use Guild\Framework\Admin\Csrf;
 use Guild\Framework\Admin\Flash;
 use Guild\Framework\Admin\PermissionCatalog;
 use Guild\Framework\Application;
+use Guild\Framework\Authentication\SignInMethod;
 use Guild\Framework\Authorization\AdminMenu;
 use Guild\Framework\Authorization\AdminNavigation;
 use Guild\Framework\Authorization\AuthorizationConfiguration;
 use Guild\Framework\Authorization\Gate;
 use Guild\Framework\Authorization\GrantRepository;
 use Guild\Framework\Authorization\Identity\IdentityReader;
-use Guild\Framework\Authorization\Identity\OidcIdentityReader;
 use Guild\Framework\Authorization\Identity\RemoteUserIdentityReader;
 use Guild\Framework\Authorization\IdentitySource;
 use Guild\Framework\Authorization\Membership\GroupDirectory;
@@ -157,10 +156,10 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
 
         $container->addShared(IdentityReader::class, static function () use ($container, $identitySource): IdentityReader {
             if ($identitySource === IdentitySource::Oidc) {
-                /** @var OidcAuthenticationService $authentication */
-                $authentication = $container->get(OidcAuthenticationService::class);
+                /** @var SignInMethod $signIn */
+                $signIn = $container->get(SignInMethod::class);
 
-                return new OidcIdentityReader($authentication);
+                return $signIn;
             }
 
             /** @var ServerRequestInterface $request */

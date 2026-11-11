@@ -128,8 +128,8 @@ return [
 ### `addAuthentication()`
 
 `config/authentication.php` returns a `Guild\Access\Authentication\OIDC\OidcConfiguration`. The
-container then provides `OidcAuthenticationService` and `OidcAuthenticationMiddleware`; add the middleware
-to the routes that need a signed-in user:
+container then provides `OidcAuthenticationService`, `OidcAuthenticationMiddleware` and
+`Guild\Framework\Authentication\SignInMethod`; add the middleware to the routes that need a signed-in user:
 
 ```php
 $router->lazyMiddleware(OidcAuthenticationMiddleware::class);

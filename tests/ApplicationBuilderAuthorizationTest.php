@@ -6,6 +6,7 @@ namespace Guild\Framework\Test;
 
 use Guild\Framework\Authorization\Membership\GrouperGroupDirectory;
 use Guild\Framework\Application;
+use Guild\Framework\Authentication\IuLoginSignIn;
 use Guild\Framework\ApplicationBuilder;
 use Guild\Framework\Authorization\AdminMenu;
 use Guild\Framework\Authorization\AdminNavigation;
@@ -13,7 +14,6 @@ use Guild\Framework\Authorization\AuthorizationConfiguration;
 use Guild\Framework\Authorization\Gate;
 use Guild\Framework\Authorization\GrantRepository;
 use Guild\Framework\Authorization\Identity\IdentityReader;
-use Guild\Framework\Authorization\Identity\OidcIdentityReader;
 use Guild\Framework\Authorization\Identity\RemoteUserIdentityReader;
 use Guild\Framework\Authorization\IdentitySource;
 use Guild\Framework\Authorization\Membership\GrouperDirectoryConfiguration;
@@ -64,7 +64,7 @@ use Psr\Log\NullLogger;
 #[UsesClass(GrouperDirectoryConfiguration::class)]
 #[UsesClass(UserResolver::class)]
 #[UsesClass(RemoteUserIdentityReader::class)]
-#[UsesClass(OidcIdentityReader::class)]
+#[UsesClass(IuLoginSignIn::class)]
 #[UsesClass(MembershipProvider::class)]
 #[UsesClass(MembershipCache::class)]
 #[UsesClass(GrantRepository::class)]
@@ -212,9 +212,9 @@ final class ApplicationBuilderAuthorizationTest extends TestCase
 
         self::assertInstanceOf(UserResolver::class, $app->get(UserResolver::class), 'the resolver is registered');
         self::assertInstanceOf(
-            OidcIdentityReader::class,
+            IuLoginSignIn::class,
             $app->get(IdentityReader::class),
-            'identity comes from guild/access, whose services now resolve because a logger is bound',
+            'identity comes from the IU Login sign-in method, whose guild/access services resolve because a logger is bound',
         );
     }
 
