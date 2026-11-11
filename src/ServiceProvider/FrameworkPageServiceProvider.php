@@ -86,8 +86,8 @@ class FrameworkPageServiceProvider extends AbstractServiceProvider
         $container->addShared(VerifyCsrfToken::class, static function () use ($container): VerifyCsrfToken {
             /** @var Csrf $csrf */
             $csrf = $container->get(Csrf::class);
-            /** @var AdminPage $page */
-            $page = $container->get(AdminPage::class);
+            /** @var StatusPage $page */
+            $page = $container->get(StatusPage::class);
 
             return new VerifyCsrfToken($csrf, $page);
         });

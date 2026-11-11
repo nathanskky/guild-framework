@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Test\Authentication;
 
-use Guild\Framework\Admin\AdminPage;
 use Guild\Framework\Admin\Csrf;
+use Guild\Framework\Authorization\StatusPage;
 use Guild\Framework\Application;
 use Guild\Framework\ApplicationBuilder;
 use Guild\Framework\Authentication\SignInMethod;
@@ -37,7 +37,7 @@ use Psr\Log\NullLogger;
 #[UsesClass(FrameworkPageServiceProvider::class)]
 #[UsesClass(Csrf::class)]
 #[UsesClass(VerifyCsrfToken::class)]
-#[UsesClass(AdminPage::class)]
+#[UsesClass(StatusPage::class)]
 #[UsesClass(FakeSignIn::class)]
 #[UsesClass(ArraySessionStore::class)]
 #[UsesClass(Identity::class)]
@@ -93,6 +93,15 @@ final class SignOutTest extends TestCase
 
         self::assertSame(403, $response->getStatusCode(), 'a form without the session token is refused');
         self::assertSame('jdoe', $signIn->read()?->username, 'and jdoe is still signed in');
+    }
+
+    public function testAnExpiredFormIsExplainedWithoutAdministrationChrome(): void
+    {
+        $body = (string) $this->dispatch('POST', ['_csrf' => 'other'], new FakeSignIn(new Identity('jdoe')))->getBody();
+
+        self::assertStringContainsString('Form expired', $body, 'the page says why the form was refused');
+        self::assertStringNotContainsString('Administration', $body, 'in an application that has no administration pages');
+        self::assertStringNotContainsString('/framework/authorization', $body, 'and without linking to them');
     }
 
     public function testAWrongTokenIsRefused(): void

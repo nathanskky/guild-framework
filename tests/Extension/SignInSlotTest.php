@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Test\Extension;
 
-use Guild\Framework\Admin\AdminPage;
 use Guild\Framework\Admin\Csrf;
+use Guild\Framework\Authorization\StatusPage;
 use Guild\Framework\Application;
 use Guild\Framework\ApplicationBuilder;
 use Guild\Framework\Authentication\SignInMethod;
@@ -48,7 +48,7 @@ use Psr\Log\NullLogger;
 #[UsesClass(ArraySessionStore::class)]
 #[UsesClass(Csrf::class)]
 #[UsesClass(VerifyCsrfToken::class)]
-#[UsesClass(AdminPage::class)]
+#[UsesClass(StatusPage::class)]
 #[UsesClass(SignOutController::class)]
 #[UsesClass(Identity::class)]
 final class SignInSlotTest extends TestCase

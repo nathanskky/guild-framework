@@ -461,6 +461,13 @@ an application with the extensions they want. A `composer install --no-dev` buil
 extension that was installed with `require-dev`, and neither does `composer dump-autoload --no-dev` run over a
 development install.
 
+## Upgrading to 2.1.4
+
+Nothing needs action. A form refused by `VerifyCsrfToken`, sign-out included, gets the "Form expired" status
+page: the application's layout with `addRivet()`, plain HTML without it. Without Rivet it used to carry an
+"Administration" header linking to `/framework/authorization`, even in an application with no administration
+pages.
+
 ## Upgrading to 2.1.3
 
 Nothing needs action. A signed-in visitor whose request throws `AuthenticationRequiredException` gets the

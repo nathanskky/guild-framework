@@ -5,14 +5,11 @@ declare(strict_types=1);
 namespace Guild\Framework\Test\Admin;
 
 use Guild\Framework\Testing\ArraySessionStore;
-use Guild\Framework\Admin\AdminPage;
 use Guild\Framework\Admin\Csrf;
+use Guild\Framework\Authorization\StatusPage;
 use Guild\Framework\Admin\Flash;
 use Guild\Framework\Middleware\VerifyCsrfToken;
 use Guild\Framework\Session\SessionStore;
-use Guild\Rivet\Page\PageDefaults;
-use Guild\Rivet\Render\Renderer;
-use Guild\Rivet\Rivet;
 use Laminas\Diactoros\Response\EmptyResponse;
 use Laminas\Diactoros\ServerRequest;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -25,7 +22,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 #[CoversClass(Csrf::class)]
 #[CoversClass(Flash::class)]
 #[CoversClass(VerifyCsrfToken::class)]
-#[UsesClass(AdminPage::class)]
+#[UsesClass(StatusPage::class)]
 #[UsesClass(ArraySessionStore::class)]
 final class CsrfAndFlashTest extends TestCase
 {
@@ -106,7 +103,7 @@ final class CsrfAndFlashTest extends TestCase
     {
         return new VerifyCsrfToken(
             new Csrf($session),
-            new AdminPage(static fn (): Renderer => new Renderer(Rivet::registry(), pageDefaults: new PageDefaults(appTitle: 'Test'))),
+            new StatusPage(static fn () => null),
         );
     }
 

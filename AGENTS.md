@@ -12,7 +12,7 @@ standalone**.
 - **PHP:** `~8.5.0`
 - **Remote:** `git@github.com:nathanskky/guild-framework.git` (SSH), or
   `https://github.com/nathanskky/guild-framework.git` if you don't have SSH keys set up
-- **Current release:** `2.1.3`
+- **Current release:** `2.1.4`
 - **Default branch:** `develop`. **Work targets `develop`** — see
   [Branching and pull requests](#branching-and-pull-requests).
 - **`composer.lock` is gitignored** here, so there is no lock to keep in sync.
@@ -396,9 +396,10 @@ with guild/dev-tools' persona sign-in on locally, neither `config/authentication
   `VerifyCsrfToken` (any non-GET must carry the session's `_csrf` field). `Admin\AdminPage` renders through
   the application's Rivet `Renderer` when `addRivet()` was called, else through a fallback whose navigation
   is the admin menu alone. Controllers and middleware are bound explicitly, so no autowiring is needed.
-  `AdminPage`, `Csrf` and `VerifyCsrfToken` are bound by `FrameworkPageServiceProvider`, which
+  `AdminPage`, `StatusPage`, `Csrf` and `VerifyCsrfToken` are bound by `FrameworkPageServiceProvider`, which
   `Application` registers with its base bindings, so the sign-out route uses them without
-  `addAuthorization()` or `addRivet()`.
+  `addAuthorization()` or `addRivet()`. A form `VerifyCsrfToken` refuses gets a 403 "Form expired"
+  `StatusPage`, not an `AdminPage`, so it never carries the administration layout outside the admin pages.
 - **Eloquent query-builder calls lose model types under PHPStan.** Without Larastan, `->orderBy()` and
   other calls forwarded to the query builder make `->get()` return `Collection<int, stdClass>`. Load the
   models, then sort the collection (`->get()->sortBy('name')`); the models' `@property` tags then type
