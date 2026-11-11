@@ -12,9 +12,8 @@ use Psr\Http\Server\RequestHandlerInterface;
 
 /**
  * Lets a signed-in request through and sends a guest to sign in, however
- * this application signs people in.
- *
- * @internal
+ * this application signs people in. Add it to a route with
+ * `lazyMiddleware(RequireSignIn::class)`.
  */
 final readonly class RequireSignIn implements MiddlewareInterface
 {

@@ -11,10 +11,10 @@ use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The administration pages end to end: a CAS application, REMOTE_USER on the
- * request, a fake Grouper, and in-memory SQLite, dispatched through the real
- * Router. Membership is cached in the session, so each test runs in its own
- * process.
+ * The administration pages end to end: a CAS application (an OIDC one for the
+ * sign-in test), REMOTE_USER on the request, a fake Grouper, and in-memory
+ * SQLite, dispatched through the real Router. Membership is cached in the
+ * session, so each test runs in its own process.
  *
  * Integration coverage across many classes, so it declares none; the units
  * are covered by their own tests.
