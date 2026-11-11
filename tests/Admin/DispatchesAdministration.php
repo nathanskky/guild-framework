@@ -7,7 +7,9 @@ namespace Guild\Framework\Test\Admin;
 use Guild\Framework\Application;
 use Guild\Framework\Authorization\IdentitySource;
 use Guild\Framework\Router;
+use Guild\Framework\Session\SessionStore;
 use Guild\Framework\TemplateEngine;
+use Guild\Framework\Testing\ArraySessionStore;
 use Guild\Grouper\Testing\FakeGrouper;
 use Guild\Framework\Test\Authorization\Support\GrantsDatabase;
 use Guild\Framework\Test\Authorization\Support\TestPermission;
@@ -104,9 +106,10 @@ trait DispatchesAdministration
 
         $app = $builder->addAuthorization(IdentitySource::Cas, TestPermission::class)->create();
 
+        $session = new ArraySessionStore();
+
         if ($form !== null && $csrf) {
-            session_start();
-            $_SESSION['guild_framework_csrf'] = 'test-token';
+            $session->put('guild_framework_csrf', 'test-token');
             $form['_csrf'] = 'test-token';
         }
 
@@ -120,6 +123,7 @@ trait DispatchesAdministration
         // Registered before the lazy provider first resolves, so these win.
         $app->addShared(GrouperClient::class, new FakeGrouper($grouper)->client);
         $app->addShared(ServerRequestInterface::class, $request, overwrite: true);
+        $app->addShared(SessionStore::class, $session, overwrite: true);
 
         $capsule = $app->get(Capsule::class);
         self::assertInstanceOf(Capsule::class, $capsule);

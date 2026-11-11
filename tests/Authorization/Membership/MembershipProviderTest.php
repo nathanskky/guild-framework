@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Test\Authorization\Membership;
 
+use Guild\Framework\Testing\ArraySessionStore;
 use Guild\Framework\Authorization\Membership\Membership;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
-use Guild\Framework\Authorization\Membership\Session;
 use Guild\Framework\Exception\AuthorizationUnavailableException;
 use Guild\Grouper\Testing\FakeGrouper;
 use Guild\Grouper\Exception\GrouperConfigurationException;
@@ -15,8 +15,6 @@ use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use Monolog\Processor\PsrLogMessageProcessor;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\PreserveGlobalState;
-use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
@@ -26,9 +24,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(MembershipProvider::class)]
 #[UsesClass(Membership::class)]
 #[UsesClass(MembershipCache::class)]
-#[UsesClass(Session::class)]
-#[RunTestsInSeparateProcesses]
-#[PreserveGlobalState(false)]
+#[UsesClass(ArraySessionStore::class)]
 final class MembershipProviderTest extends TestCase
 {
     private const int TTL = 900;
@@ -44,7 +40,7 @@ final class MembershipProviderTest extends TestCase
     protected function setUp(): void
     {
         $this->log = new TestHandler();
-        $this->cache = new MembershipCache(new Session());
+        $this->cache = new MembershipCache(new ArraySessionStore());
     }
 
     public function testAMissAsksGrouperAndCachesTheAnswer(): void

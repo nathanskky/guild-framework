@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Test\Authorization\Support;
 
+use Guild\Framework\Testing\ArraySessionStore;
 use Guild\Framework\Authorization\Gate;
 use Guild\Framework\Authorization\GrantRepository;
 use Guild\Framework\Authorization\Identity\Identity;
 use Guild\Framework\Authorization\Identity\IdentityReader;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
-use Guild\Framework\Authorization\Membership\Session;
 use Guild\Framework\Authorization\Policy\PolicyRegistry;
 use Guild\Framework\Authorization\UserResolver;
 use Guild\Framework\Test\Authorization\Support\Policy\DocumentPolicy;
@@ -54,7 +54,7 @@ final class GateFactory
             $reader,
             new MembershipProvider(
                 $grouper->client,
-                new MembershipCache(new Session()),
+                new MembershipCache(new ArraySessionStore()),
                 new NullLogger(),
                 900,
                 3600,

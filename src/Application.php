@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Guild\Framework;
 
+use Guild\Framework\Session\NativeSessionStore;
+use Guild\Framework\Session\SessionStore;
 use Laminas\Diactoros\ServerRequestFactory;
 use Laminas\HttpHandlerRunner\Emitter\SapiEmitter;
 use League\Container\Argument\Literal\StringArgument;
@@ -115,6 +117,7 @@ final class Application extends Container
             return new Router()->setStrategy($strategy);
         });
         $this->addShared(SapiEmitter::class);
+        $this->addShared(SessionStore::class, NativeSessionStore::class);
         $this->addShared(LoggerInterface::class, static fn (): LoggerInterface => new Logger(
             'framework',
             [new ErrorLogHandler()],

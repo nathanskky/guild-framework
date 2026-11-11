@@ -22,7 +22,6 @@ use Guild\Framework\Authorization\Identity\RemoteUserIdentityReader;
 use Guild\Framework\Authorization\IdentitySource;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
-use Guild\Framework\Authorization\Membership\Session;
 use Guild\Framework\Authorization\Permission;
 use Guild\Framework\Authorization\Policy\PolicyRegistry;
 use Guild\Framework\Authorization\UserResolver;
@@ -33,6 +32,7 @@ use Guild\Framework\Exception\ConfigurationException;
 use Guild\Framework\Middleware\RequireSystemAdmin;
 use Guild\Framework\Middleware\VerifyCsrfToken;
 use Guild\Framework\Rivet\ContainerNavigation;
+use Guild\Framework\Session\SessionStore;
 use Guild\Grouper\GrouperClient;
 use Guild\Rivet\Page\NavigationProvider;
 use Guild\Rivet\Page\PageDefaults;
@@ -105,9 +105,14 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
             ]),
         ));
 
-        $container->addShared(MembershipCache::class, static fn (): MembershipCache => new MembershipCache(
-            new Session(),
-        ));
+        $session = static function () use ($container): SessionStore {
+            /** @var SessionStore $session */
+            $session = $container->get(SessionStore::class);
+
+            return $session;
+        };
+
+        $container->addShared(MembershipCache::class, static fn (): MembershipCache => new MembershipCache($session()));
 
         $container->addShared(MembershipProvider::class, static function () use ($container, $config): MembershipProvider {
             /** @var GrouperClient $grouper */
@@ -227,8 +232,15 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
                 );
             },
         ));
-        $container->addShared(Csrf::class, static fn (): Csrf => new Csrf(new Session()));
-        $container->addShared(Flash::class, static fn (): Flash => new Flash(new Session()));
+        $session = static function () use ($container): SessionStore {
+            /** @var SessionStore $session */
+            $session = $container->get(SessionStore::class);
+
+            return $session;
+        };
+
+        $container->addShared(Csrf::class, static fn (): Csrf => new Csrf($session()));
+        $container->addShared(Flash::class, static fn (): Flash => new Flash($session()));
         $container->addShared(PermissionCatalog::class, static fn (): PermissionCatalog => new PermissionCatalog($permissionEnum));
 
         $page = static function () use ($container): AdminPage {

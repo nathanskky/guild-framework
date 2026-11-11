@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Authorization\Membership;
 
+use Guild\Framework\Session\SessionStore;
 use Guild\Grouper\GrouperGroup;
 
 /**
- * Caches one user's Grouper membership in the PHP session.
+ * Caches one user's Grouper membership in the session.
  *
  * Groups are stored as plain arrays rather than serialized GrouperGroup
  * objects, so a change to guild/grouper's classes cannot leave unreadable
@@ -20,7 +21,7 @@ final readonly class MembershipCache
 {
     private const string KEY = 'guild_framework_membership';
 
-    public function __construct(private Session $session)
+    public function __construct(private SessionStore $session)
     {
     }
 
@@ -32,9 +33,7 @@ final readonly class MembershipCache
      */
     public function get(string $username): ?array
     {
-        $this->session->ensureStarted();
-
-        $entry = $_SESSION[self::KEY] ?? null;
+        $entry = $this->session->get(self::KEY);
 
         if (
             ! is_array($entry)
@@ -65,9 +64,7 @@ final readonly class MembershipCache
      */
     public function put(string $username, array $groups, int $fetchedAt): void
     {
-        $this->session->ensureStarted();
-
-        $_SESSION[self::KEY] = [
+        $this->session->put(self::KEY, [
             'username' => $username,
             'fetched_at' => $fetchedAt,
             'groups' => array_map(
@@ -80,7 +77,7 @@ final readonly class MembershipCache
                 ],
                 $groups,
             ),
-        ];
+        ]);
     }
 
     private function groupFrom(mixed $group): ?GrouperGroup

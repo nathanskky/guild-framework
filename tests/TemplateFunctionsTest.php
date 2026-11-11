@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Test;
 
+use Guild\Framework\Testing\ArraySessionStore;
 use Guild\Framework\Authorization\Gate;
 use Guild\Framework\Authorization\GrantRepository;
 use Guild\Framework\Authorization\Handles;
@@ -11,7 +12,6 @@ use Guild\Framework\Authorization\HandlesResource;
 use Guild\Framework\Authorization\Identity\Identity;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
-use Guild\Framework\Authorization\Membership\Session;
 use Guild\Framework\Authorization\Policy\PolicyMethod;
 use Guild\Framework\Authorization\Policy\PolicyRegistry;
 use Guild\Framework\Authorization\TemplateAuthorization;
@@ -30,8 +30,6 @@ use Latte\Engine;
 use Latte\Loaders\StringLoader;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\Attributes\PreserveGlobalState;
-use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 use Twig\Environment;
@@ -54,7 +52,7 @@ use Twig\Loader\ArrayLoader;
 #[UsesClass(HandlesResource::class)]
 #[UsesClass(MembershipProvider::class)]
 #[UsesClass(MembershipCache::class)]
-#[UsesClass(Session::class)]
+#[UsesClass(ArraySessionStore::class)]
 #[UsesClass(GrantRepository::class)]
 final class TemplateFunctionsTest extends TestCase
 {
@@ -95,8 +93,6 @@ final class TemplateFunctionsTest extends TestCase
     }
 
     #[DataProvider('unavailableTemplates')]
-    #[RunInSeparateProcess]
-    #[PreserveGlobalState(false)]
     public function testUnavailableMembershipEscapesRenderingUnwrapped(string $engine, string $template): void
     {
         $gate = GateFactory::make(new FakeGrouper([FakeGrouper::unavailable()]), new Identity('jdoe'), new GrantsDatabase());

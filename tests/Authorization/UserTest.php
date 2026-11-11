@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Test\Authorization;
 
+use Guild\Framework\Testing\ArraySessionStore;
 use Guild\Framework\Authorization\GrantRepository;
 use Guild\Framework\Authorization\Identity\Identity;
 use Guild\Framework\Authorization\Membership\Membership;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
-use Guild\Framework\Authorization\Membership\Session;
 use Guild\Framework\Authorization\User;
 use Guild\Framework\Authorization\UserGroup;
 use Guild\Framework\Exception\AuthorizationUnavailableException;
@@ -20,8 +20,6 @@ use Guild\Framework\Test\Authorization\Support\OtherPermission;
 use Guild\Framework\Test\Authorization\Support\TestPermission;
 use Guild\Grouper\GrouperGroup;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\PreserveGlobalState;
-use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -36,9 +34,7 @@ use Psr\Log\NullLogger;
 #[UsesClass(Membership::class)]
 #[UsesClass(MembershipCache::class)]
 #[UsesClass(MembershipProvider::class)]
-#[UsesClass(Session::class)]
-#[RunTestsInSeparateProcesses]
-#[PreserveGlobalState(false)]
+#[UsesClass(ArraySessionStore::class)]
 final class UserTest extends TestCase
 {
     private const int NOW = 100_000;
@@ -189,9 +185,14 @@ final class UserTest extends TestCase
         );
     }
 
+    /**
+     * One session per test, shared by every cache the test builds, as a real visitor's session is.
+     */
+    private ?ArraySessionStore $session = null;
+
     private function cache(): MembershipCache
     {
-        return new MembershipCache(new Session());
+        return new MembershipCache($this->session ??= new ArraySessionStore());
     }
 
     private function grouperGroup(string $identifier, string $label): GrouperGroup

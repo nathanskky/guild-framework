@@ -7,8 +7,6 @@ namespace Guild\Framework\Test\Admin;
 use Guild\Grouper\Testing\FakeGrouper;
 use Guild\Framework\Test\Authorization\Support\GrantsDatabase;
 use PHPUnit\Framework\Attributes\CoversNothing;
-use PHPUnit\Framework\Attributes\PreserveGlobalState;
-use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -21,8 +19,6 @@ use PHPUnit\Framework\TestCase;
  * are covered by their own tests.
  */
 #[CoversNothing]
-#[RunTestsInSeparateProcesses]
-#[PreserveGlobalState(false)]
 final class AdministrationRoutesTest extends TestCase
 {
     use DispatchesAdministration;

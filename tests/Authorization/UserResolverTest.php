@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Test\Authorization;
 
+use Guild\Framework\Testing\ArraySessionStore;
 use Guild\Framework\Authorization\GrantRepository;
 use Guild\Framework\Authorization\Identity\Identity;
 use Guild\Framework\Authorization\Identity\IdentityReader;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
-use Guild\Framework\Authorization\Membership\Session;
 use Guild\Framework\Authorization\User;
 use Guild\Framework\Authorization\UserResolver;
 use Guild\Grouper\Testing\FakeGrouper;
@@ -26,7 +26,7 @@ use Psr\Log\NullLogger;
 #[UsesClass(GrantRepository::class)]
 #[UsesClass(MembershipCache::class)]
 #[UsesClass(MembershipProvider::class)]
-#[UsesClass(Session::class)]
+#[UsesClass(ArraySessionStore::class)]
 final class UserResolverTest extends TestCase
 {
     public function testAnIdentityResolvesToTheSameUserEveryTime(): void
@@ -74,7 +74,7 @@ final class UserResolverTest extends TestCase
     {
         return new UserResolver(
             $reader,
-            new MembershipProvider(new FakeGrouper([])->client, new MembershipCache(new Session()), new NullLogger(), 900, 3600, time(...)),
+            new MembershipProvider(new FakeGrouper([])->client, new MembershipCache(new ArraySessionStore()), new NullLogger(), 900, 3600, time(...)),
             new GrantRepository(new GrantsDatabase()->connection),
             TestPermission::class,
             'My App Admins',

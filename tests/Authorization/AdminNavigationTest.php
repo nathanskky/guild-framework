@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Test\Authorization;
 
+use Guild\Framework\Testing\ArraySessionStore;
 use Guild\Framework\Authorization\AdminMenu;
 use Guild\Framework\Authorization\AdminNavigation;
 use Guild\Framework\Authorization\GrantRepository;
@@ -11,7 +12,6 @@ use Guild\Framework\Authorization\Identity\Identity;
 use Guild\Framework\Authorization\Membership\Membership;
 use Guild\Framework\Authorization\Membership\MembershipCache;
 use Guild\Framework\Authorization\Membership\MembershipProvider;
-use Guild\Framework\Authorization\Membership\Session;
 use Guild\Framework\Authorization\User;
 use Guild\Framework\Authorization\UserResolver;
 use Guild\Framework\Exception\ConfigurationException;
@@ -21,8 +21,6 @@ use Guild\Framework\Test\Authorization\Support\GrantsDatabase;
 use Guild\Rivet\Page\PageDefaults;
 use Laminas\Diactoros\ServerRequest;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\PreserveGlobalState;
-use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
@@ -38,9 +36,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(Membership::class)]
 #[UsesClass(MembershipCache::class)]
 #[UsesClass(MembershipProvider::class)]
-#[UsesClass(Session::class)]
-#[RunTestsInSeparateProcesses]
-#[PreserveGlobalState(false)]
+#[UsesClass(ArraySessionStore::class)]
 final class AdminNavigationTest extends TestCase
 {
     public function testASystemAdminSeesTheMenuLastByDefault(): void

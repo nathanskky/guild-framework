@@ -76,8 +76,10 @@ local reference, following the house style of `access/tests/`:
 - No PHPUnit mocks. Grouper is a real `GrouperClient` over Guzzle's `MockHandler`
   (`Guild\Grouper\Testing\FakeGrouper`, shipped by guild/grouper); the authorization tables are in-memory SQLite
   (`Support/GrantsDatabase.php`).
-- Anything touching the PHP session runs with `#[RunTestsInSeparateProcesses]` and
-  `#[PreserveGlobalState(false)]`, and uses a real `session_start()`.
+- Session state goes through `Session\SessionStore`; tests pass a `Testing\ArraySessionStore`, or override
+  the container's `SessionStore` binding with one (`addShared(..., overwrite: true)`). Only tests of
+  `NativeSessionStore`, and of guild/access's session reads, use `#[RunTestsInSeparateProcesses]` with
+  `#[PreserveGlobalState(false)]` and a real `session_start()`.
 
 ## Architecture
 
@@ -341,8 +343,8 @@ authorization on.
   thrown. `User::isSystemAdmin()` never uses stale membership. The role/permission mapping is one query per
   request, so an administrator's change takes effect on the next request.
 - **The framework starts a PHP session on the CAS path.** Nothing else does there — Apache authenticates
-  before PHP runs — so `Authorization\Membership\Session` starts one, with the same cookie parameters as
-  `guild/access`, the first time membership is needed. Public pages that never check authorization get no
+  before PHP runs — so `Session\NativeSessionStore`, the default `SessionStore` binding, starts one with
+  the same cookie parameters as `guild/access` the first time the session is read or written. Public pages that never check authorization get no
   session cookie.
 - **The default logger writes through PHP's `error_log()`.** `Application` binds `LoggerInterface` to a
   Monolog `Logger` on the `framework` channel with an `ErrorLogHandler`, so records land wherever the

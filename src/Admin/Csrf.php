@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Admin;
 
-use Guild\Framework\Authorization\Membership\Session;
+use Guild\Framework\Session\SessionStore;
 use Guild\Rivet\Html\Html;
 
 /**
@@ -22,19 +22,17 @@ final readonly class Csrf
 
     private const string KEY = 'guild_framework_csrf';
 
-    public function __construct(private Session $session)
+    public function __construct(private SessionStore $session)
     {
     }
 
     public function token(): string
     {
-        $this->session->ensureStarted();
-
-        $token = $_SESSION[self::KEY] ?? null;
+        $token = $this->session->get(self::KEY);
 
         if (! is_string($token) || $token === '') {
             $token = bin2hex(random_bytes(32));
-            $_SESSION[self::KEY] = $token;
+            $this->session->put(self::KEY, $token);
         }
 
         return $token;
