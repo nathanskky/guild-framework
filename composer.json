@@ -24,6 +24,7 @@
     ],
     "require": {
         "php": "~8.5.0",
+        "composer-runtime-api": "^2.1",
         "guild/access": "^1.0",
         "guild/grouper": "^0.1.3",
         "league/container": "^5.1",

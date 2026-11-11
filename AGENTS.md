@@ -116,6 +116,17 @@ Application::configure($basePath)
     ->run();
 ```
 
+**Extensions run before the application's own calls.** `Application::configure($basePath, ?array $extensions = null)`
+takes a list of `Extension\ApplicationExtension`s, or with `null` discovers them: `Extension\ExtensionDiscovery`
+finds the installed Composer packages of type `guild-extension` and builds the class each names in
+`extra.guild.extension` of its `composer.json`. Before returning the builder, it calls each extension's
+`configure($builder)`, in package name order. An extension may choose a slot with `useSignInMethod()`,
+`useGroupDirectory()` or `useSystemAdminGroup()`; the `@internal` `Extension\ClaimedSlots`, held on
+`Application`, records each choice and who made it, and a second choice of the same slot throws
+`ConfigurationException` naming both. `create()` logs each takeover notice at `notice`, then calls each
+extension's `boot($app)`; both happen on the first `create()` only. A `--no-dev` install leaves out dev
+packages, so an extension required with `require-dev` never runs in production.
+
 - `addRouting()` requires `{basePath}/routes/routes.php`, which must return a `callable` receiving the
   `Router` instance. **This is the consuming app's routes file, not this repo's `routes/`** — see Landmines.
 - `addAuthentication()` requires `{basePath}/config/authentication.php`, which must return an
@@ -164,10 +175,11 @@ Application::configure($basePath)
   `addAuthentication()`, because Apache authenticates before PHP runs. It registers
   `AuthorizationServiceProvider`, which lazily binds `UserResolver`, `Gate` and what they need.
   `$policies` is a flat list of policy classes, each declaring `#[HandlesResource]`; they are read and
-  validated on first use, never at boot, and resolved through the container. **Templates get `can()` and
-  `cannot()`** whenever a template engine is configured too — `addAuthorization()` and
+  validated on first use, never at boot, and resolved through the container. **Templates get `can()`,
+  `cannot()` and `current_user()`** whenever a template engine is configured too — `addAuthorization()` and
   `addTemplateEngine()` may be called in either order; whichever runs second registers the eager
-  `AuthorizationTemplateServiceProvider`. **With `addRivet()`, System Admin group members see an
+  `AuthorizationTemplateServiceProvider`. `sign_out_form()` comes from `addAuthentication()` instead, by the
+  same rule, through `AuthenticationTemplateServiceProvider`. **With `addRivet()`, System Admin group members see an
   administration menu** in `rvt_page`'s header; `$adminMenu` sets its label and position, and `null` opts
   out. The grant lookup resolves the shared `Capsule`, so `addIlluminateDatabase()` must also have been
   called.

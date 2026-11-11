@@ -6,13 +6,16 @@ namespace Guild\Framework;
 
 use Error;
 use Guild\Access\Authentication\OIDC\OidcConfiguration;
+use Guild\Framework\Authentication\SignInMethod;
 use Guild\Framework\Authorization\AdminMenu;
 use Guild\Framework\Authorization\AuthorizationConfiguration;
 use Guild\Framework\Authorization\IdentitySource;
+use Guild\Framework\Authorization\Membership\GroupDirectory;
 use Guild\Framework\Authorization\Membership\GrouperDirectoryConfiguration;
 use Guild\Framework\Authorization\Permission;
 use Guild\Framework\Controller\Authentication\SignOutController;
 use Guild\Framework\Exception\ConfigurationException;
+use Guild\Framework\Extension\ApplicationExtension;
 use Guild\Framework\Middleware\AuthorizationFailureResponder;
 use Guild\Framework\Middleware\RequireSignIn;
 use Guild\Framework\Middleware\RequireSystemAdmin;
@@ -33,8 +36,67 @@ use Psr\Log\LoggerInterface;
 
 readonly class ApplicationBuilder
 {
-    public function __construct(private Application $app)
+    /**
+     * @param  list<ApplicationExtension>  $extensions  Booted by create().
+     */
+    public function __construct(private Application $app, private array $extensions = [])
     {
+    }
+
+    /**
+     * Choose how this application signs people in. Meant for extensions,
+     * whose configure() runs before the application's own calls. Each slot
+     * can be chosen once.
+     *
+     * @param  class-string<SignInMethod>  $class
+     */
+    public function useSignInMethod(string $class): self
+    {
+        if (! is_subclass_of($class, SignInMethod::class)) {
+            throw new ConfigurationException(
+                $class . ' cannot be the sign-in method: it does not implement SignInMethod.'
+            );
+        }
+
+        $this->app->claimedSlots->claimSignInMethod($class);
+
+        return $this;
+    }
+
+    /**
+     * Choose where users' groups come from. Meant for extensions, whose
+     * configure() runs before the application's own calls. Each slot can be
+     * chosen once.
+     *
+     * @param  class-string<GroupDirectory>  $class
+     */
+    public function useGroupDirectory(string $class): self
+    {
+        if (! is_subclass_of($class, GroupDirectory::class)) {
+            throw new ConfigurationException(
+                $class . ' cannot be the group directory: it does not implement GroupDirectory.'
+            );
+        }
+
+        $this->app->claimedSlots->claimGroupDirectory($class);
+
+        return $this;
+    }
+
+    /**
+     * Choose the System Admin group's ACM label. Meant for extensions, whose
+     * configure() runs before the application's own calls. Each slot can be
+     * chosen once.
+     */
+    public function useSystemAdminGroup(string $label): self
+    {
+        if (trim($label) === '') {
+            throw new ConfigurationException('The System Admin group label must not be blank.');
+        }
+
+        $this->app->claimedSlots->claimSystemAdminGroup($label);
+
+        return $this;
     }
 
     public function addRouting(): self
@@ -352,10 +414,37 @@ readonly class ApplicationBuilder
     /**
      * Get the application instance.
      *
+     * The first call logs a notice for each slot an extension took over, then
+     * boots each extension. Later calls only return the application.
+     *
      * @return Application
      */
     public function create(): Application
     {
+        if (! $this->app->claimedSlots->markCreated()) {
+            return $this->app;
+        }
+
+        $takeovers = $this->app->claimedSlots->takeovers();
+
+        if ($takeovers !== []) {
+            $logger = $this->app->get(LoggerInterface::class);
+
+            if (! $logger instanceof LoggerInterface) {
+                throw new ConfigurationException(
+                    'The container did not return a LoggerInterface. Pass one to withLogger().'
+                );
+            }
+
+            foreach ($takeovers as $takeover) {
+                $logger->notice($takeover);
+            }
+        }
+
+        foreach ($this->extensions as $extension) {
+            $extension->boot($this->app);
+        }
+
         return $this->app;
     }
 }

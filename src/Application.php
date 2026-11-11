@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Guild\Framework;
 
+use Guild\Framework\Extension\ApplicationExtension;
+use Guild\Framework\Extension\ClaimedSlots;
+use Guild\Framework\Extension\ExtensionDiscovery;
 use Guild\Framework\ServiceProvider\FrameworkPageServiceProvider;
 use Guild\Framework\Session\NativeSessionStore;
 use Guild\Framework\Session\SessionStore;
@@ -51,6 +54,14 @@ final class Application extends Container
     private ?string $authorizationPermissions = null;
 
     /**
+     * The slots extensions and the application chose through the builder's
+     * use*() methods. Held here because ApplicationBuilder is readonly.
+     *
+     * @internal
+     */
+    public readonly ClaimedSlots $claimedSlots;
+
+    /**
      * The base path for the application installation.
      *
      * @var string
@@ -61,6 +72,8 @@ final class Application extends Container
     {
         parent::__construct();
 
+        $this->claimedSlots = new ClaimedSlots();
+
         if ($basePath) {
             $this->setBasePath($basePath);
         }
@@ -68,10 +81,29 @@ final class Application extends Container
         $this->registerBaseBindings();
     }
 
-
-    public static function configure(string $basePath): ApplicationBuilder
+    /**
+     * Start building an application. Each extension is configured first,
+     * before the application's own builder calls, and booted by create().
+     *
+     * @param  list<ApplicationExtension>|null  $extensions  Null discovers the installed guild-extension packages.
+     */
+    public static function configure(string $basePath, ?array $extensions = null): ApplicationBuilder
     {
-        return new ApplicationBuilder(new self($basePath));
+        $extensions ??= ExtensionDiscovery::fromComposer()->extensions();
+
+        $app = new self($basePath);
+        $builder = new ApplicationBuilder($app, $extensions);
+
+        foreach ($extensions as $extension) {
+            $app->claimedSlots->during(
+                $extension::class,
+                static function () use ($extension, $builder): void {
+                    $extension->configure($builder);
+                },
+            );
+        }
+
+        return $builder;
     }
 
     /**
