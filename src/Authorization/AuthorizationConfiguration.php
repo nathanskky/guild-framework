@@ -16,26 +16,24 @@ use Guild\Framework\Exception\ConfigurationException;
  */
 final readonly class AuthorizationConfiguration
 {
-    public string $systemAdminGroup;
+    public ?string $systemAdminGroup;
 
     /**
-     * @param  string  $systemAdminGroup  The ACM label (displayExtension) of the group whose members
-     *                                    administer the application. Membership bypasses every check.
+     * @param  ?string  $systemAdminGroup  The ACM label (displayExtension) of the group whose members
+     *                                     administer the application. Membership bypasses every check.
+     *                                     Blank is null, which is valid only when an installed extension
+     *                                     supplies the label; otherwise addAuthorization() refuses to boot.
      * @param  int  $membershipTtl  Seconds a user's cached Grouper membership is used before
      *                              Grouper is asked again.
      * @param  int  $staleCap  Seconds past the TTL cached membership may still be used while
      *                         Grouper is unreachable. Zero never uses stale membership.
      */
     public function __construct(
-        string $systemAdminGroup,
+        ?string $systemAdminGroup = null,
         public int $membershipTtl = 900,
         public int $staleCap = 3600,
     ) {
-        $systemAdminGroup = trim($systemAdminGroup);
-
-        if ($systemAdminGroup === '') {
-            throw new ConfigurationException('The system admin group label must not be blank.');
-        }
+        $systemAdminGroup = trim($systemAdminGroup ?? '');
 
         if ($membershipTtl <= 0) {
             throw new ConfigurationException('The membership TTL must be a positive number of seconds.');
@@ -45,6 +43,6 @@ final readonly class AuthorizationConfiguration
             throw new ConfigurationException('The stale cap must not be negative.');
         }
 
-        $this->systemAdminGroup = $systemAdminGroup;
+        $this->systemAdminGroup = $systemAdminGroup === '' ? null : $systemAdminGroup;
     }
 }

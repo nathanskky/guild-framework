@@ -94,7 +94,7 @@ readonly class ApplicationBuilder
             throw new ConfigurationException('The System Admin group label must not be blank.');
         }
 
-        $this->app->claimedSlots->claimSystemAdminGroup($label);
+        $this->app->claimedSlots->claimSystemAdminGroup(trim($label));
 
         return $this;
     }
@@ -281,10 +281,13 @@ readonly class ApplicationBuilder
             );
         }
 
+        $systemAdminGroup = $this->resolveSystemAdminGroup($config);
+
         $this->app->addServiceProvider(new AuthorizationServiceProvider(
             $identitySource,
             $permissions,
             $config,
+            $systemAdminGroup,
             $directory,
             $policies,
             $adminMenu,
@@ -300,6 +303,33 @@ readonly class ApplicationBuilder
         }
 
         return $this;
+    }
+
+    /**
+     * The label of the System Admin group: the one an extension chose, else the one in
+     * config/authorization.php. Every honoured claim is logged.
+     */
+    private function resolveSystemAdminGroup(AuthorizationConfiguration $config): string
+    {
+        $claim = $this->app->claimedSlots->systemAdminGroup;
+
+        if ($claim !== null) {
+            $this->app->claimedSlots->takeover($config->systemAdminGroup === null
+                ? sprintf("System Admin group '%s' was chosen by %s.", $claim->value, $claim->claimant)
+                : sprintf(
+                    "System Admin group '%s' was chosen by %s; the label in config/authorization.php was not used.",
+                    $claim->value,
+                    $claim->claimant,
+                ));
+
+            return $claim->value;
+        }
+
+        return $config->systemAdminGroup ?? throw new ConfigurationException(
+            'config/authorization.php gives no System Admin group label. Pass systemAdminGroup: the ACM label '
+            . 'of the group whose members administer this application (starter reads it from '
+            . 'AUTHORIZATION_SYSTEM_ADMIN_GROUP).'
+        );
     }
 
     /**

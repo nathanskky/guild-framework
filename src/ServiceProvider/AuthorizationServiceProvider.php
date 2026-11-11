@@ -49,6 +49,8 @@ use Psr\Log\LoggerInterface;
 class AuthorizationServiceProvider extends AbstractServiceProvider
 {
     /**
+     * @param  string  $systemAdminGroup  The resolved ACM label of the System Admin group: an extension's
+     *                                    choice, else the one in $config.
      * @param  GrouperDirectoryConfiguration|SlotClaim  $directory  Where groups come from: live Grouper, or
      *                                                              the class an extension chose. Only live
      *                                                              Grouper binds a GrouperClient.
@@ -59,6 +61,7 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
         private readonly IdentitySource $identitySource,
         private readonly string $permissionEnum,
         private readonly AuthorizationConfiguration $config,
+        private readonly string $systemAdminGroup,
         private readonly GrouperDirectoryConfiguration|SlotClaim $directory,
         private readonly array $policies = [],
         private readonly ?AdminMenu $adminMenu = new AdminMenu(),
@@ -159,7 +162,9 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
 
         $permissionEnum = $this->permissionEnum;
 
-        $container->addShared(UserResolver::class, static function () use ($container, $config, $permissionEnum): UserResolver {
+        $systemAdminGroup = $this->systemAdminGroup;
+
+        $container->addShared(UserResolver::class, static function () use ($container, $systemAdminGroup, $permissionEnum): UserResolver {
             /** @var IdentityReader $identities */
             $identities = $container->get(IdentityReader::class);
             /** @var MembershipProvider $memberships */
@@ -167,7 +172,7 @@ class AuthorizationServiceProvider extends AbstractServiceProvider
             /** @var GrantRepository $grants */
             $grants = $container->get(GrantRepository::class);
 
-            return new UserResolver($identities, $memberships, $grants, $permissionEnum, $config->systemAdminGroup);
+            return new UserResolver($identities, $memberships, $grants, $permissionEnum, $systemAdminGroup);
         });
 
         $policies = $this->policies;

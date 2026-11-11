@@ -174,7 +174,9 @@ packages, so an extension required with `require-dev` never runs in production.
   group directory (`useGroupDirectory()`), the file is not read, a takeover notice is logged, `GroupDirectory`
   resolves to the chosen class, and no `GrouperClient` is bound; the group pages then answer 503 on the
   three register actions, because registering checks a name in Grouper, while editing, mapping and
-  unregistering still work. It is the only `add*()` method that takes arguments **and** reads config
+  unregistering still work. The System Admin label may be blank in `config/authorization.php` only when an
+  extension chose it (`useSystemAdminGroup()`); the builder trims either label, uses the chosen one, logs a
+  takeover notice, and otherwise throws `ConfigurationException`. It is the only `add*()` method that takes arguments **and** reads config
   files, and the split is deliberate: **arguments carry code-level facts** — the identity source and the
   application's `Permission` enum class, which PHPStan and an IDE can check — **the config file carries
   everything that varies by deployment**, with the Grouper secret in `config/grouper.php`. With

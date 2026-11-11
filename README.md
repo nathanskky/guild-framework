@@ -241,7 +241,7 @@ the application's database and are managed by System Admins in the framework's a
 
    | Field | Default | Description |
    |---|---|---|
-   | `systemAdminGroup` | *(required)* | ACM label of the System Admin group. Members are allowed everything. |
+   | `systemAdminGroup` | *(required)* | ACM label of the System Admin group. Members are allowed everything. May be blank only when an installed extension supplies the label; otherwise boot fails. |
    | `membershipTtl` | `900` | Seconds a user's Grouper membership is cached in the session. |
    | `staleCap` | `3600` | Seconds past the TTL cached membership may still be used while Grouper is unreachable. `0` disables. |
 

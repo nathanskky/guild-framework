@@ -22,6 +22,27 @@ final class AuthorizationConfigurationTest extends TestCase
         self::assertSame(3600, $config->staleCap, 'stale membership is served for up to 60 minutes by default');
     }
 
+    public function testABlankLabelIsNull(): void
+    {
+        self::assertNull((new AuthorizationConfiguration())->systemAdminGroup, 'no label means null');
+        self::assertNull((new AuthorizationConfiguration('  '))->systemAdminGroup, 'a blank label means null');
+    }
+
+    public function testALabelIsTrimmed(): void
+    {
+        $config = new AuthorizationConfiguration(systemAdminGroup: "\tMy App Admins\n");
+
+        self::assertSame('My App Admins', $config->systemAdminGroup, 'padding around the label is removed');
+    }
+
+    public function testThe1xPositionalFormStillWorks(): void
+    {
+        $config = new AuthorizationConfiguration('My App Admins');
+
+        self::assertSame('My App Admins', $config->systemAdminGroup, 'the label is the first positional argument');
+        self::assertSame(900, $config->membershipTtl, 'the other settings keep their defaults');
+    }
+
     public function testAZeroStaleCapIsAllowed(): void
     {
         $config = new AuthorizationConfiguration('Admins', staleCap: 0);
@@ -34,7 +55,6 @@ final class AuthorizationConfigurationTest extends TestCase
      */
     public static function invalidSettings(): iterable
     {
-        yield 'blank label' => ['  ', 900, 3600];
         yield 'zero TTL' => ['Admins', 0, 3600];
         yield 'negative stale cap' => ['Admins', 900, -1];
     }
