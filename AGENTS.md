@@ -113,7 +113,8 @@ Namespaces under `src/`, all below `Guild\Framework\`:
 - `Model` — the Eloquent models behind the authorization tables
 - `ServiceProvider` — one provider per `add*()` concern
 - `Session` — `SessionStore` and its native implementation
-- `Testing` — `ArraySessionStore` and `GroupDirectoryContract`, for tests of applications and extensions
+- `Testing` — `ArraySessionStore`, `GroupDirectoryContract` and `FrameworkSchema` (runs the real migrations,
+  e.g. on in-memory SQLite, through the `@internal` `PrefixAwareSQLiteAdapter`), for tests of applications and extensions
 - `Twig`, `Latte`, `Rivet` — template functions per engine, and the navigation adapter for Rivet
 
 ### Bootstrap flow
@@ -263,7 +264,8 @@ at [github.com/cakephp/phinx](https://github.com/cakephp/phinx). Match the exist
 
 Two details are specific to this project and worth knowing up front:
 
-- **`created_by` / `updated_by` are `string` with `'limit' => 8`** — they hold an IU username, not a user ID.
+- **`created_by` / `updated_by` are `string` with `'limit' => 64`** — they hold a username, not a user ID.
+  IU usernames fit in 8 characters, but OIDC and guild/dev-tools persona usernames do not.
 - **Foreign key columns need `'signed' => false`** to match the unsigned primary keys they reference.
   Without it the column types disagree and the constraint fails.
 

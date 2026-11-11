@@ -291,6 +291,12 @@ the application's database and are managed by System Admins in the framework's a
    vendor/bin/phinx -c vendor/guild/framework/phinx.php migrate -e framework
    ```
 
+   Run the same command after upgrading the framework, since a release can add migrations. The
+   `created_by` and `updated_by` columns hold usernames of up to 64 characters.
+
+   Tests can create the same tables on any connection, such as in-memory SQLite, with
+   `Guild\Framework\Testing\FrameworkSchema::migrate($connection)`.
+
 ### Checking permissions
 
 Constructor-inject `Guild\Framework\Authorization\Gate`:
