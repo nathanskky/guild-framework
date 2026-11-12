@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Extension;
 
+use Closure;
+use Composer\Autoload\ClassLoader;
 use Composer\InstalledVersions;
 use Guild\Framework\Exception\ConfigurationException;
 use JsonException;
@@ -12,8 +14,9 @@ use JsonException;
  * Finds the installed Composer packages of type guild-extension and builds the
  * ApplicationExtension each names in extra.guild.extension.
  *
- * A --no-dev install leaves out dev packages, so an extension required with
- * require-dev is never discovered in production.
+ * An extension required with require-dev is never discovered in a production
+ * build: after composer install --no-dev, or composer dump-autoload --no-dev
+ * over a development install.
  *
  * @internal
  */
@@ -33,7 +36,7 @@ final readonly class ExtensionDiscovery
      */
     public static function fromComposer(): self
     {
-        return self::fromInstalledData(InstalledVersions::getAllRawData());
+        return self::fromInstalledData(InstalledVersions::getAllRawData(), self::composerAutoloads(...));
     }
 
     /**
@@ -42,13 +45,16 @@ final readonly class ExtensionDiscovery
      * directory, the first naming a package winning.
      *
      * A dev package is skipped when its dataset was installed without dev
-     * packages. After composer dump-autoload --no-dev the package is still in
-     * vendor/ and still listed, but its classes are not autoloaded, so
-     * building it would fail production boot.
+     * packages, or when nothing is autoloaded from its directory. The second
+     * covers composer dump-autoload --no-dev over a development install, which
+     * leaves the package in vendor/ and the dataset still marked as dev, but
+     * drops the package from the autoloader, so building it would fail boot.
+     * A package that is autoloaded but names a missing class is still an error.
      *
      * @param  array<mixed>  $datasets
+     * @param  Closure(string): bool  $autoloads  Whether classes are autoloaded from inside a directory.
      */
-    public static function fromInstalledData(array $datasets): self
+    public static function fromInstalledData(array $datasets, Closure $autoloads): self
     {
         $installPaths = [];
 
@@ -64,7 +70,7 @@ final readonly class ExtensionDiscovery
                     || ! is_array($version)
                     || ($version['type'] ?? null) !== self::PACKAGE_TYPE
                     || ! is_string($version['install_path'] ?? null)
-                    || (($version['dev_requirement'] ?? false) === true && ! $devInstalled)
+                    || (($version['dev_requirement'] ?? false) === true && (! $devInstalled || ! $autoloads($version['install_path'])))
                 ) {
                     continue;
                 }
@@ -74,6 +80,68 @@ final readonly class ExtensionDiscovery
         }
 
         return new self($installPaths);
+    }
+
+    /**
+     * Whether a registered Composer autoloader loads classes from inside
+     * $directory, through its PSR-4 or PSR-0 directories, fallback directories
+     * or class map. Composer writes paths through vendor/composer/.., so the
+     * few directories are compared with dot segments resolved. The class map,
+     * thousands of entries in an optimized autoloader, is compared as written,
+     * against $directory as written and resolved: Composer writes a package's
+     * install path and its class map entries the same way.
+     */
+    public static function composerAutoloads(string $directory): bool
+    {
+        $root = self::withoutDotSegments($directory) . '/';
+        $asWritten = rtrim($directory, '/') . '/';
+
+        foreach (ClassLoader::getRegisteredLoaders() as $loader) {
+            $directories = [
+                ...array_merge(...array_values($loader->getPrefixesPsr4())),
+                ...array_merge(...array_values($loader->getPrefixes())),
+                ...$loader->getFallbackDirsPsr4(),
+                ...$loader->getFallbackDirs(),
+            ];
+
+            foreach ($directories as $candidate) {
+                if (str_starts_with(self::withoutDotSegments($candidate) . '/', $root)) {
+                    return true;
+                }
+            }
+
+            foreach ($loader->getClassMap() as $file) {
+                if (str_starts_with($file, $asWritten) || str_starts_with($file, $root)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * $path with . and .. segments resolved, without touching the filesystem.
+     */
+    private static function withoutDotSegments(string $path): string
+    {
+        $path = str_replace('\\', '/', $path);
+
+        if (! str_contains($path, '/.')) {
+            return rtrim($path, '/');
+        }
+
+        $segments = [];
+
+        foreach (explode('/', $path) as $index => $segment) {
+            if ($segment === '..' && $segments !== [] && end($segments) !== '') {
+                array_pop($segments);
+            } elseif ($segment !== '.' && ($segment !== '' || $index === 0)) {
+                $segments[] = $segment;
+            }
+        }
+
+        return implode('/', $segments);
     }
 
     /**

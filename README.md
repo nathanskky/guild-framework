@@ -461,6 +461,12 @@ an application with the extensions they want. A `composer install --no-dev` buil
 extension that was installed with `require-dev`, and neither does `composer dump-autoload --no-dev` run over a
 development install.
 
+## Upgrading to 2.1.5
+
+Nothing needs action. An application built with `composer dump-autoload --no-dev` over a development install
+boots without its `require-dev` extensions, as one built with `composer install --no-dev` does. In 2.1.4 and
+earlier it failed at boot, naming the extension's class as missing.
+
 ## Upgrading to 2.1.4
 
 Nothing needs action. A form refused by `VerifyCsrfToken`, sign-out included, gets the "Form expired" status

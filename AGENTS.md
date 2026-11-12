@@ -12,7 +12,7 @@ standalone**.
 - **PHP:** `~8.5.0`
 - **Remote:** `git@github.com:nathanskky/guild-framework.git` (SSH), or
   `https://github.com/nathanskky/guild-framework.git` if you don't have SSH keys set up
-- **Current release:** `2.1.4`
+- **Current release:** `2.1.5`
 - **Default branch:** `develop`. **Work targets `develop`** — see
   [Branching and pull requests](#branching-and-pull-requests).
 - **`composer.lock` is gitignored** here, so there is no lock to keep in sync.
@@ -241,8 +241,10 @@ that reads the slot. `create()` logs each takeover notice, and each choice nothi
 each extension's `boot($app)`, then throws if the container `has()` no binding for a chosen class that is used;
 it checks with `has()` rather than `get()` so nothing is built before tests override services. All of this
 happens on the first `create()` only. `ApplicationBuilder::path()` lets an extension's `configure()` find
-`config/`. A `--no-dev` install
-leaves out dev packages, so an extension required with `require-dev` never runs in production.
+`config/`. An extension required
+with `require-dev` never runs in production: discovery skips it after `composer install --no-dev`, and after
+`composer dump-autoload --no-dev` over a development install, which leaves it in `vendor/` but out of the
+autoloader.
 
 ### Request lifecycle
 

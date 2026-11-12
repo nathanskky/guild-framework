@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Guild\Framework\Test\Extension;
 
+use Closure;
 use Guild\Framework\Exception\ConfigurationException;
 use Guild\Framework\Extension\ExtensionDiscovery;
 use Guild\Framework\Test\Extension\Support\QuietExtension;
@@ -61,24 +62,55 @@ final class ExtensionDiscoveryTest extends TestCase
         self::assertInstanceOf(RecordingExtension::class, $extensions[1], 'zeta/recording comes second');
     }
 
-    public function testADevExtensionIsSkippedWhenDevPackagesAreNotInstalled(): void
+    public function testADevExtensionIsFoundInADevelopmentInstall(): void
     {
-        $path = $this->package(['extra' => ['guild' => ['extension' => 'Acme\DevTools\NotAutoloadedExtension']]]);
+        $path = $this->package(['extra' => ['guild' => ['extension' => RecordingExtension::class]]]);
 
-        $discovery = ExtensionDiscovery::fromInstalledData([
-            self::dataset(dev: false, versions: ['acme/dev-tools' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $path, devRequirement: true)]),
-        ]);
+        $discovery = ExtensionDiscovery::fromInstalledData(
+            [self::dataset(dev: true, versions: ['acme/dev-tools' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $path, devRequirement: true)])],
+            self::autoloadsFrom($path),
+        );
 
-        self::assertSame([], $discovery->extensions(), 'after dump-autoload --no-dev the package is still on disk, but its class is not loadable');
+        self::assertCount(1, $discovery->extensions(), 'a development install discovers its require-dev extensions');
     }
 
-    public function testTheSameUnloadableExtensionFailsWhenDevPackagesAreInstalled(): void
+    public function testADevExtensionIsSkippedAfterANoDevInstall(): void
+    {
+        $path = $this->package(['extra' => ['guild' => ['extension' => RecordingExtension::class]]]);
+
+        $discovery = ExtensionDiscovery::fromInstalledData(
+            [self::dataset(dev: false, versions: ['acme/dev-tools' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $path, devRequirement: true)])],
+            self::autoloadsFrom($path),
+        );
+
+        self::assertSame([], $discovery->extensions(), 'composer install --no-dev records that dev packages are left out, and that is enough');
+    }
+
+    public function testADevExtensionIsSkippedWhenTheAutoloaderLeavesItOut(): void
     {
         $path = $this->package(['extra' => ['guild' => ['extension' => 'Acme\DevTools\NotAutoloadedExtension']]]);
 
-        $discovery = ExtensionDiscovery::fromInstalledData([
-            self::dataset(dev: true, versions: ['acme/dev-tools' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $path, devRequirement: true)]),
-        ]);
+        $discovery = ExtensionDiscovery::fromInstalledData(
+            [self::dataset(dev: true, versions: ['acme/dev-tools' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $path, devRequirement: true)])],
+            self::autoloadsFrom(),
+        );
+
+        self::assertSame(
+            [],
+            $discovery->extensions(),
+            'composer dump-autoload --no-dev leaves the package on disk and the install recorded as a development one, '
+            . 'but nothing is autoloaded from it',
+        );
+    }
+
+    public function testAnAutoloadedDevExtensionNamingAMissingClassIsStillAnError(): void
+    {
+        $path = $this->package(['extra' => ['guild' => ['extension' => 'Acme\DevTools\NotAutoloadedExtension']]]);
+
+        $discovery = ExtensionDiscovery::fromInstalledData(
+            [self::dataset(dev: true, versions: ['acme/dev-tools' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $path, devRequirement: true)])],
+            self::autoloadsFrom($path),
+        );
 
         $this->expectException(ConfigurationException::class);
         $this->expectExceptionMessage('names Acme\DevTools\NotAutoloadedExtension as its extension, but that class does not exist.');
@@ -86,15 +118,28 @@ final class ExtensionDiscoveryTest extends TestCase
         $discovery->extensions();
     }
 
-    public function testADevExtensionIsFoundWhenDevPackagesAreInstalled(): void
+    public function testARequiredExtensionIsNotSkippedForItsAutoload(): void
     {
         $path = $this->package(['extra' => ['guild' => ['extension' => RecordingExtension::class]]]);
 
-        $discovery = ExtensionDiscovery::fromInstalledData([
-            self::dataset(dev: true, versions: ['acme/dev-tools' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $path, devRequirement: true)]),
-        ]);
+        $discovery = ExtensionDiscovery::fromInstalledData(
+            [self::dataset(dev: false, versions: ['acme/recording' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $path)])],
+            self::autoloadsFrom(),
+        );
 
-        self::assertCount(1, $discovery->extensions(), 'a development install discovers its require-dev extensions');
+        self::assertCount(1, $discovery->extensions(), 'only a require-dev package can be left out of the autoloader, so only one is skipped for it');
+    }
+
+    public function testComposersAutoloaderIsAskedAboutTheInstallDirectory(): void
+    {
+        $repository = dirname(__DIR__, 2);
+
+        self::assertTrue(ExtensionDiscovery::composerAutoloads($repository), 'this repository\'s src/ is autoloaded');
+        self::assertTrue(
+            ExtensionDiscovery::composerAutoloads($repository . '/vendor/composer/../guild/grouper'),
+            'a package path written as Composer writes it, through vendor/composer/..',
+        );
+        self::assertFalse(ExtensionDiscovery::composerAutoloads($this->root), 'a directory nothing is loaded from');
     }
 
     public function testPackagesOfOtherTypesAreIgnored(): void
@@ -104,7 +149,7 @@ final class ExtensionDiscoveryTest extends TestCase
                 'acme/library' => self::installed('library', $this->root . '/library'),
                 'acme/virtual' => ['pretty_version' => '1.0.0', 'provided' => ['1.0.0']],
             ]),
-        ]);
+        ], self::autoloadsFrom($this->root . '/library'));
 
         self::assertSame([], $discovery->extensions(), 'only guild-extension packages with an install path are extensions');
     }
@@ -117,7 +162,7 @@ final class ExtensionDiscoveryTest extends TestCase
         $discovery = ExtensionDiscovery::fromInstalledData([
             self::dataset(dev: true, versions: $entry),
             self::dataset(dev: true, versions: ['acme/recording' => self::installed(ExtensionDiscovery::PACKAGE_TYPE, $this->root . '/elsewhere')]),
-        ]);
+        ], self::autoloadsFrom($path));
 
         self::assertCount(1, $discovery->extensions(), 'a package seen by two vendor directories is built once, from the first');
     }
@@ -179,6 +224,16 @@ final class ExtensionDiscoveryTest extends TestCase
             ExtensionDiscovery::fromComposer()->extensions(),
             'guild/framework installs no guild-extension package',
         );
+    }
+
+    /**
+     * Composer's answer, for tests: classes are autoloaded from these directories only.
+     *
+     * @return Closure(string): bool
+     */
+    private static function autoloadsFrom(string ...$directories): Closure
+    {
+        return static fn (string $directory): bool => in_array($directory, $directories, true);
     }
 
     /**
