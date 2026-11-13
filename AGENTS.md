@@ -1,503 +1,81 @@
-# AGENTS.md
+# AGENTS.md: guild/framework
 
-Guidance for AI coding agents (and new humans) working in this repository.
+> For maintainers of guild/framework and their agents. App developers start at [docs/index.md](docs/index.md).
 
-## What this is
+The [workspace handbook](../AGENTS.md) covers cross-repo workflow and conventions.
 
-Guild Framework (`guild/framework`) is a small IU-centric PHP framework — a thin composition layer over
-existing PSR-friendly packages rather than a from-scratch framework. Namespace `Guild\Framework\`,
-autoloaded from `src/`. It is consumed as a Composer dependency by downstream applications and is **not run
-standalone**.
+guild/framework is the application kernel for Guild apps: a thin composition layer over league/container,
+league/route, Eloquent, Twig, Latte, guild/access, guild/grouper and guild/rivet. It isn't run on its
+own; apps install it.
 
-- **PHP:** `~8.5.0`
-- **Remote:** `git@github.com:nathanskky/guild-framework.git` (SSH), or
-  `https://github.com/nathanskky/guild-framework.git` if you don't have SSH keys set up
-- **Current release:** `2.1.5`
-- **Default branch:** `develop`. **Work targets `develop`** — see
-  [Branching and pull requests](#branching-and-pull-requests).
-- **`composer.lock` is gitignored** here, so there is no lock to keep in sync.
+## Verify
 
-## Sibling packages
+`composer check` must show no new failures. `composer analyse` reports 7 known errors in
+`ServiceProvider/ViewServiceProvider.php`; the comment in its `register()` explains them. Take your own
+baseline first, because uncommitted work in your tree adds to that count.
 
-These repos are developed side by side but are **independent git repos**. There is no root
-`composer.json` and no root git repository, so each is cloned and installed on its own. Do not invent
-root-level tooling or a shared root autoloader.
+## Keeping docs current
 
-| Package | Namespace | Role |
-|---|---|---|
-| `guild/framework` *(this one)* | `Guild\Framework\` | Application kernel / DI container |
-| `guild/access` | `Guild\Access\` | IU Login (OIDC) authentication library. **This package depends on it** (`^1.0`, via VCS repo) |
-| `guild/grouper` | `Guild\Grouper\` | Read-only IU Grouper group-membership lookup. **This package depends on it** (`^0.1.3`, via VCS repo). Pre-1.0 — treat minor releases as potentially breaking |
-| `guild/starter` | `Guild\Starter\` | Runnable example app; the primary consumer of this package |
-| `iu/notifications` | `IU\Notifications\` | IU Notifications API client. Fully independent — different GitHub host, and its `<8.5` PHP constraint is mutually exclusive with this package's `~8.5.0` |
-| `guild/rivet` | `Guild\Rivet\` | IU Rivet Design System components for Twig and Latte, exposed through `ApplicationBuilder::addRivet()`. **This package depends on it** (`^1.0`, via VCS repo) |
+Every code change gets a docs check in the same commit. Check README, `docs/`, AGENTS.md, the docblocks
+of public classes and the comments at the changed code for anything the change makes wrong or incomplete:
 
-`access/README.md` is the authoritative reference for the OIDC library's config fields, redirect-safety
-rules, session handling, and error types. Read it before touching anything auth-related here.
+- Update a page that describes the changed behavior.
+- If no page covers new public behavior, add one to `docs/` and list it in `docs/index.md`.
+- If a maintainer needs a fact the code doesn't show, add a comment where the code is.
+- If the behavior is gone, remove its page and its index entry.
+- If the change adds or renames a domain term, update `docs/reference/glossary.md`.
 
-## Verify your change
+Then check the pages that link to a changed page for text that's now wrong, and link a new page from
+related pages. A non-obvious choice gets a decision record in `docs/decisions/`.
 
-**Run `composer check` before you change anything and keep that output as your baseline.** Some checks are
-red in this repo today, and the working tree may carry in-progress work that is not yours. Your obligation
-is **no new failures** against that baseline — not a green run.
-
-```bash
-composer install       # install dependencies
-composer test          # phpunit
-composer analyse       # phpstan, level 10, scoped to src/, with --memory-limit=512M
-composer format:check  # pint, PSR-12 style check (writes nothing)
-composer check         # test, then analyse, then style check; stops at the first failure
-```
-
-**`composer test` is green.** `phpunit.xml` sets `failOnEmptyTestSuite="true"`, so an empty run would
-report `No tests executed!` and exit non-zero rather than falsely exiting 0 — keep the flag.
-
-**`composer analyse` is red: 7 pre-existing errors on a clean checkout of `develop`.** All of them are in
-committed code, so you will see them on a fresh clone:
-
-- **7 in `ServiceProvider/ViewServiceProvider.php`** — two `method.notFound` on `$container->getPath()`,
-  which is not declared on `DefinitionContainerInterface` (see [Landmines](#landmines)), plus five
-  cascading errors where the resulting `mixed` flows into string concatenation and the Twig/Latte loader
-  constructors.
-
-`composer analyse` passes `--memory-limit=512M`: at PHP's default 128M a parallel worker runs out of memory
-on the Eloquent-heavy admin controllers and the result is incomplete. Pass the same flag when running
-`vendor/bin/phpstan` directly.
-
-If your count is higher than 7, the extra errors are from uncommitted work in your tree — which is why
-taking your own baseline before you start is still worth the ten seconds.
-
-**Tests are stricter than you expect.** `phpunit.xml` is the strictest config in the workspace:
-`requireCoverageMetadata`, `beStrictAboutCoverageMetadata`, `beStrictAboutOutputDuringTests`,
-`failOnPhpunitDeprecation`, `failOnRisky`, `failOnWarning`. A new test **without**
-`#[CoversClass]`/`#[CoversMethod]` fails the whole run; list collaborators with `#[UsesClass]`. Test classes
-belong under `Guild\Framework\Test\` (autoload-dev maps this to `tests/`); `tests/Authorization/` is the
-local reference, following the house style of `access/tests/`:
-
-- No PHPUnit mocks. Grouper is a real `GrouperClient` over Guzzle's `MockHandler`
-  (`Guild\Grouper\Testing\FakeGrouper`, shipped by guild/grouper); the authorization tables are in-memory SQLite
-  (`Support/GrantsDatabase.php`).
-- Session state goes through `Session\SessionStore`; tests pass a `Testing\ArraySessionStore`, or override
-  the container's `SessionStore` binding with one (`addShared(..., overwrite: true)`). Only tests of
-  `NativeSessionStore`, and of guild/access's session reads, use `#[RunTestsInSeparateProcesses]` with
-  `#[PreserveGlobalState(false)]` and a real `session_start()`.
-
-## Architecture
-
-The framework wires several third-party libraries into one application container:
-
-- **`league/container`** — the DI container (`Application extends League\Container\Container`)
-- **`league/route`** — HTTP routing (`Router extends League\Route\Router`)
-- **`laminas/laminas-diactoros`** + **`laminas/laminas-httphandlerrunner`** — PSR-7 request / emitter
-- **`illuminate/database`** + **`illuminate/events`** — Eloquent, used standalone via `Capsule`
-- **`twig/twig`** + **`latte/latte`** — optional template engines behind `View`/`TemplateEngine`
-- **`robmorgan/phinx`** — migrations
-- **`guild/access`** — OIDC authentication primitives
-- **`guild/grouper`** — read-only Grouper group-membership lookup, for the authorization layer
-- **`guzzlehttp/guzzle`** — the HTTP client handed to `GrouperClient`, with the timeouts from `config/grouper.php`
-- **`monolog/monolog`** — the default `Psr\Log\LoggerInterface` binding
-- **`guild/rivet`** — IU Rivet Design System components for both engines
-
-### Source layout
-
-Namespaces under `src/`, all below `Guild\Framework\`:
-
-- `Admin` — the administration pages' helpers: layout, forms, CSRF, flash messages
-- `Authentication` — `SignInMethod`, its IU Login implementation `IuLoginSignIn`, and `SignOutForm`
-- `Authorization` — `Gate`, `User`, `UserResolver`, policies, grants, and `Identity` / `IdentityReader`
-- `Authorization\Membership` — `GroupDirectory`, its Grouper-backed implementation, and the cached membership
-- `Controller` — the administration pages' controllers (`Authorization`) and sign-out (`Authentication`)
-- `Exception` — `ConfigurationException` and the authorization exceptions
-- `Extension` — `ApplicationExtension`, `ExtensionDiscovery`, and the slot claims extensions make
-- `Middleware` — `RequireSignIn`, `RequireSystemAdmin`, `VerifyCsrfToken`, `AuthorizationFailureResponder`
-- `Model` — the Eloquent models behind the authorization tables
-- `ServiceProvider` — one provider per `add*()` concern
-- `Session` — `SessionStore` and its native implementation
-- `Testing` — `ArraySessionStore`, `GroupDirectoryContract` and `FrameworkSchema` (runs the real migrations,
-  e.g. on in-memory SQLite, through the `@internal` `PrefixAwareSQLiteAdapter`), for tests of applications and extensions
-- `Twig`, `Latte`, `Rivet` — template functions per engine, and the navigation adapter for Rivet
-
-### Bootstrap flow
-
-Everything starts from `Application::configure($basePath)`, which returns an `ApplicationBuilder`. The
-builder is a readonly, fluent object — each `add*` method wires one concern into the underlying
-`Application` container and returns `$this`; the chain ends with `->create()` to get the `Application` back:
-
-```php
-Application::configure($basePath)
-    ->enableAutoWiring()
-    ->addIlluminateDatabase()
-    ->addAuthentication()           // OIDC only; a CAS application omits it
-    ->addTemplateEngine(TemplateEngine::Twig)
-    ->addRivet($pageDefaults)
-    ->addAuthorization(IdentitySource::Oidc, AppPermission::class, policies: [DocumentPolicy::class])
-    ->addRouting()
-    ->create()
-    ->run();
-```
-
-- `addRouting()` requires `{basePath}/routes/routes.php`, which must return a `callable` receiving the
-  `Router` instance. **This is the consuming app's routes file, not this repo's `routes/`** — see Landmines.
-- `addAuthentication()` requires `{basePath}/config/authentication.php` (unless an installed extension chose
-  the sign-in method), which must return an `OidcConfiguration` instance specifically (checked with
-  `instanceof`, not against an interface). It is handed to `AuthenticationServiceProvider`, which lazily
-  registers `OidcConfiguration`, `OidcAuthenticationService`, `OidcAuthenticationMiddleware`, `SignInMethod`
-  (bound to `IuLoginSignIn`) and `RequireSignIn`. When an extension has chosen the sign-in method
-  (`useSignInMethod()`), the file is not read, a takeover notice is logged, and `SignInMethod` resolves to
-  the chosen class; nothing from guild/access is bound, and `addAuthorization(IdentitySource::Cas, ...)`
-  throws because that claim would go unused. It also mounts `POST /framework/sign-out`
-  (`Controller\Authentication\SignOutController`, behind `VerifyCsrfToken`), which hands the request to
-  `SignInMethod::signOut()`. Templates get `sign_out_form()`, which renders the CSRF-protected form
-  (`Authentication\SignOutForm`); `addAuthentication()` and `addTemplateEngine()` may be called in either
-  order, and whichever runs second registers the eager `AuthenticationTemplateServiceProvider`.
-- `addIlluminateDatabase()` requires `{basePath}/config/database.php` returning an Eloquent connection
-  array. It boots a global `Illuminate\Database\Capsule\Manager` and shares it in the container.
-- `enableAutoWiring()` adds a `League\Container\ReflectionContainer` as a delegate, so
-  constructor-injectable classes that aren't explicitly bound can still be resolved.
-- `addRivet()` registers `RivetServiceProvider`, making the Rivet components available as
-  tags in whichever engine was chosen. It reads that choice from `Application::getTemplateEngine()`,
-  so **it must be called after `addTemplateEngine()`** and throws `ConfigurationException`
-  if it is not. Like `addTemplateEngine()` it reads no config file.
-  **`RivetServiceProvider` is deliberately eager** — it implements
-  `BootableServiceProviderInterface` and does its work in `boot()`. A lazy provider only
-  registers when something asks for a service it declares, and nothing ever asks for
-  these: templates reach the components through the engine. Left lazy, the extension
-  would never be added and every `{% rvt_* %}` tag would fail as an unknown tag.
-  It optionally takes a `PageDefaults`, which the `rvt_page` layout component requires.
-  Passed explicitly rather than read from a config file: an *optional* config file is not
-  a pattern this repo has, and an application that wants its defaults in a file can
-  `require` one at the call site.
-- `addTemplateEngine(TemplateEngine $engine)` registers `ViewServiceProvider`, binding `View::class` plus
-  whichever backing engine matches the enum case (`Twig` → `Twig\Environment`/`FilesystemLoader`; `Latte` →
-  `Latte\Engine`/`FileLoader`). Unlike `addAuthentication()` and `addIlluminateDatabase()`, this **takes
-  the enum directly rather than reading a config file — there is no `config/view.php`.** Both engines load
-  templates from `{basePath}/templates` by convention. `View::render()` dispatches to `Environment::render()` or
-  `Engine::renderToString()` depending on which engine is bound.
-- `addAuthorization(IdentitySource $identitySource, string $permissions, array $policies = [],
-  ?AdminMenu $adminMenu = new AdminMenu())` requires `{basePath}/config/authorization.php`, which must return
-  an `AuthorizationConfiguration` (the System Admin group's ACM label, the membership TTL and stale cap), and
-  `{basePath}/config/grouper.php` (unless an installed extension chose the group directory), which must
-  return a `GrouperDirectoryConfiguration` (Grouper connection settings and timeouts). `config/grouper.php`
-  is read first and checked with `is_file()`, so an application that has not created it gets a
-  `ConfigurationException` telling it to move its `GrouperConfiguration` there rather than a fatal `require`
-  error. When an extension has chosen the group directory (`useGroupDirectory()`), the file is not read, a
-  takeover notice is logged, `GroupDirectory` resolves to the chosen class, and no `GrouperClient` is bound;
-  the group pages then answer 503 on the three register actions, because registering checks a name in
-  Grouper, while editing, mapping and unregistering still work. The System Admin label may be blank in
-  `config/authorization.php` only when an extension chose it (`useSystemAdminGroup()`). The chosen label wins
-  over the configured one and a takeover notice is logged; with neither, `ConfigurationException` is thrown.
-  `AuthorizationConfiguration` trims the configured label, and `useSystemAdminGroup()` trims the chosen one.
-  It is the only `add*()` method that takes arguments **and** reads config files, and the split is
-  deliberate: **arguments carry code-level facts** — the identity source and the application's `Permission`
-  enum class, which PHPStan and an IDE can check — **the config file carries everything that varies by
-  deployment**, with the Grouper secret in `config/grouper.php`. With `IdentitySource::Oidc` it **must be
-  called after `addAuthentication()`** and throws `ConfigurationException` otherwise; a CAS application never
-  calls `addAuthentication()`, because Apache authenticates before PHP runs. It registers
-  `AuthorizationServiceProvider`, which lazily binds `UserResolver`, `Gate` and what they need.
-  `$policies` is a flat list of policy classes, each declaring `#[HandlesResource]`; they are read and
-  validated on first use, never at boot, and resolved through the container. **Templates get `can()`,
-  `cannot()` and `current_user()`** whenever a template engine is configured too — `addAuthorization()` and
-  `addTemplateEngine()` may be called in either order; whichever runs second registers the eager
-  `AuthorizationTemplateServiceProvider`. `sign_out_form()` comes from `addAuthentication()` instead, by the
-  same rule, through `AuthenticationTemplateServiceProvider`. **With `addRivet()`, System Admin group members
-  see an administration menu** in `rvt_page`'s header; `$adminMenu` sets its label and position, and `null`
-  opts out. The grant lookup resolves the shared `Capsule`, so `addIlluminateDatabase()` must also have been
-  called.
-- `withLogger(LoggerInterface $logger)` replaces the default logger (see below).
-- **Config failures are wrapped** in `Guild\Framework\Exception\ConfigurationException` (a `LogicException`)
-  by `addAuthentication()`, `addIlluminateDatabase()` and `addAuthorization()`, rather than letting the
-  underlying parse/type error — or, for `config/grouper.php`, a `GrouperConfigurationException` from
-  constructing `GrouperConfiguration` — propagate raw. `ConfigurationException` covers configuration only.
-  Three runtime types sit alongside it, all `RuntimeException`s:
-  `Exception\AuthorizationException` is a denial from `Gate::authorize()`;
-  `Exception\AuthenticationRequiredException` extends it for a denied guest;
-  `Exception\AuthorizationUnavailableException` means group membership could not be
-  determined — Grouper is unreachable and no cached membership is recent enough. The last is deliberately
-  not a denial type: it is a 503, not a 403. `Middleware\AuthorizationFailureResponder`, which
-  `addAuthorization()` installs at router level, answers all three: a 403, a sign-in challenge under OIDC
-  (a 403 "Sign in required" under CAS), and a 503. It challenges only a guest: it reads the request's
-  `IdentityReader`, and a visitor who is already signed in gets the 403 even for
-  `AuthenticationRequiredException`, so `SignInMethod::challenge()` never has to handle a signed-in visitor.
-  **`addRouting()` does not do this** — it is not wrapped in a try/catch, so a missing or broken
-  `routes/routes.php` surfaces as a raw `require` failure. And if the file loads but returns something that
-  is not callable, the `is_callable()` guard means **no routes are registered and no error is raised** —
-  every request 404s with nothing to explain why. If you are adding a config-driven `add*` method, follow
-  the wrapping pattern of the other three rather than `addRouting()`.
-- **A request no route answers is a status page, not an exception.** `Routing\StatusPageStrategy`, the
-  router's strategy, answers it with `Authorization\StatusPage`: 404, or 405 with `Allow`. League puts its
-  not-found and method-not-allowed decorators in front of router-level middleware and, on that path, leaves
-  middleware registered by class name unresolved; `Routing\StatusPageResponder` resolves the rest of the
-  stack from the container and runs it, with the status page at the end.
-
-**Extensions run before the application's own calls.**
-`Application::configure($basePath, ?array $extensions = null)` takes a list of
-`Extension\ApplicationExtension`s, or with `null` discovers them: `Extension\ExtensionDiscovery` finds the installed Composer packages of type
-`guild-extension` and builds the class each names in `extra.guild.extension` of its `composer.json`. Before
-returning the builder, it calls each extension's `configure($builder)`, in package name order. An extension
-may choose a slot with `useSignInMethod()`, `useGroupDirectory()` or `useSystemAdminGroup()`; the `@internal`
-`Extension\ClaimedSlots`, held on `Application`, records each choice and who made it, and a second choice of
-the same slot throws `ConfigurationException` naming both, and so does a choice made after the `add*()` call
-that reads the slot. `create()` logs each takeover notice, and each choice nothing read, at `notice`, then calls
-each extension's `boot($app)`, then throws if the container `has()` no binding for a chosen class that is used;
-it checks with `has()` rather than `get()` so nothing is built before tests override services. All of this
-happens on the first `create()` only. `ApplicationBuilder::path()` lets an extension's `configure()` find
-`config/`. An extension required
-with `require-dev` never runs in production: discovery skips it after `composer install --no-dev`, and after
-`composer dump-autoload --no-dev` over a development install, which leaves it in `vendor/` but out of the
-autoloader.
-
-### Request lifecycle
-
-`Application::run()` pulls `Router`, `SapiEmitter`, and `ServerRequestInterface` out of the container (all
-bound in `Application::registerBaseBindings()`), dispatches the request through the router, and emits the
-response. `Router` itself adds no behavior — it exists as a named extension point over
-`League\Route\Router` so routing can be customized later without changing the public API.
-
-### Container path bindings
-
-`Application::setBasePath()` binds `path.base` and `path.config` into the container as `StringArgument`s;
-`Application::getPath($resource)` reads these back (e.g. `getPath('config')`). `ApplicationBuilder` uses
-this rather than resolving paths itself, so **any new config-driven `add*` method should follow the same
-`getPath('config') . '/whatever.php'` pattern.**
-
-### Migrations
-
-Eloquent models in `src/Model/` (`Group`, `Role`, `RolePermission`) back Phinx migrations in
-`db/migrations/` — `groups`, `roles`, `groups_roles`, `role_permissions`, all with a `framework_` table
-prefix. `groups.group_identifier` holds the Grouper system name that membership is matched on;
-`groups.name` is a free local label. Unique indexes cover `groups.group_identifier`, `groups.name`,
-`roles.name`, `groups_roles (group_id, role_id)` and `role_permissions (role_id, name)`, where
-`role_permissions.name` is the value of a case of the application's `Permission` enum.
-
-Migrations **cannot be run from this repo** — see Landmines for why and for the real command.
-
-**Writing a migration: follow the Phinx documentation** — [phinx.org/docs](https://phinx.org/docs), source
-at [github.com/cakephp/phinx](https://github.com/cakephp/phinx). Match the existing files in
-`db/migrations/` for structure rather than treating anything here as a house style.
-
-Two details are specific to this project and worth knowing up front:
-
-- **`created_by` / `updated_by` are `string` with `'limit' => 64`** — they hold a username, not a user ID.
-  IU usernames fit in 8 characters, but OIDC and guild/dev-tools persona usernames do not.
-- **Foreign key columns need `'signed' => false`** to match the unsigned primary keys they reference.
-  Without it the column types disagree and the constraint fails.
+Public behavior here includes each `add*()` call's file, arguments and order rules, the status pages and
+their text, the template functions, the slot rules, and the administration pages. A release that changes
+what an app must do gets a section in `docs/upgrading.md`. `ApplicationBuilder`, `Gate`, `User`, the
+configuration classes and the extension interfaces keep their API reference in docblocks, so a change to
+them updates the docblock.
 
 ## Conventions
 
-**This repo is formatted with Laravel Pint (PSR-12 preset), configured in `pint.json`.** Run `composer
-format` to apply it, `composer format:check` to verify without writing. Its rules are authoritative for
-anything it enforces — don't hand-fix a style issue Pint would catch, and don't fight its output. The
-patterns below are *observed*, not a style guide, and cover only what Pint doesn't decide.
+- Mark every class an app must not construct or type against `@internal`.
+- Directory names under `src/` are singular, such as `Controller` and `ServiceProvider`.
+- Each `add*()` concern has one service provider, which gets its settings by constructor injection from `ApplicationBuilder`.
+- A config-driven `add*()` reads `getPath('config') . '/name.php'` and wraps failures in `ConfigurationException`.
+- `add*()` arguments carry code-level facts; config files carry what varies by deployment.
+- A provider whose services nothing asks for, such as one that extends a template engine, must be eager.
+- Eloquent models keep untyped `protected $attributes`; everywhere else uses typed properties.
 
-- **Use `final` and `readonly` where they make sense for the class in front of you** — not to match what
-  neighboring classes or sibling packages happen to do. `Application` is `final`; `ApplicationBuilder` and
-  `View` are `readonly`; almost everything under `Authorization/`, `Admin/`, `Controller/`, `Middleware/`
-  and `Rivet/` is `final`, most of it `final readonly`; `Router`, the exceptions, the service providers
-  and the models are plain classes. That is the current state, not a policy to conform to; don't "fix" a
-  class to match its neighbors in either direction.
-  One thing genuinely worth weighing here: this is a library, so adding `final` to an already-published
-  class is a breaking change for anyone extending it.
-- Directory names under `src/` are **singular**: `Controller`, `Model`, `Exception`, `ServiceProvider`,
-  `Middleware`.
-- **Classes that are not public API carry `@internal`** — the admin pages' helpers (`Admin/`), the
-  controllers and middleware (`Middleware\RequireSignIn` and `Middleware\VerifyCsrfToken` are the public
-  exceptions: applications and extensions add them to their routes, and `Admin\Csrf` is public with them), `StatusPage`, `PolicyRegistry`, the membership cache and provider, `GrantRepository`,
-  `AdminNavigation`, `ContainerNavigation`, `TemplateAuthorization`, `Extension\ExtensionDiscovery`, the Twig and
-  Latte `AuthenticationExtension` classes, `AuthenticationServiceProvider` and
-  `AuthorizationServiceProvider` (only `ApplicationBuilder` constructs them), and `User`'s constructor. Keep that
-  marker on anything an application should not construct or type against.
-- **PHPStan level is 10 here.** Levels differ per package (`access` at `max`, `notification` at 5, `starter`
-  has none). Do not assume one bar across the workspace.
-- Eloquent models are the one place typed properties are *not* used — they need untyped
-  `protected $attributes`.
+`addRouting()` doesn't follow the wrapping rule; its docblock says what that costs, so don't copy it. For
+providers and migrations, follow the league/container and Phinx documentation and match the existing
+files.
 
-**Adding a service provider: follow the league/container documentation** —
-[container.thephpleague.com/5.x/service-providers](https://container.thephpleague.com/5.x/service-providers/).
-Match the existing files in `src/ServiceProvider/` for structure rather than treating anything here as a
-house style.
+In migrations, `created_by` and `updated_by` are `string` with `'limit' => 64`, because they hold
+usernames and persona usernames exceed IU's 8 characters. Foreign key columns need `'signed' => false` to
+match the unsigned primary keys.
 
-One detail specific to this project: providers receive whatever they need by **constructor injection from
-`ApplicationBuilder`**, rather than reading a config file themselves. The builder does any loading and
-validation (see [Bootstrap flow](#bootstrap-flow)) and passes the result in. What that result is depends
-entirely on the service.
+## Tests
 
-**A consuming application only needs the config file for the functionality it actually enables.** Each
-`add*` method reads its own file and nothing else, so an app that never calls a given method never needs
-that file:
+- Give every test class `#[CoversClass]` or `#[CoversMethod]`, and list collaborators with `#[UsesClass]`; PHPUnit fails the run otherwise.
+- Don't use PHPUnit mocks. Use guild/grouper's `FakeGrouper` and in-memory SQLite through `tests/Support/GrantsDatabase.php`.
+- Pass a `Testing\ArraySessionStore`, or override the container's `SessionStore` binding with one.
+- Run in separate processes only tests of `NativeSessionStore` and of guild/access's session reads.
 
-| Builder call | File it requires, under the app's `$basePath` |
-|---|---|
-| `addRouting()` | `routes/routes.php` |
-| `addAuthentication()` | `config/authentication.php`, unless an installed extension chose the sign-in method |
-| `addIlluminateDatabase()` | `config/database.php` |
-| `addTemplateEngine()` | none — takes the enum directly; renders from `templates/` |
-| `addRivet()` | none — but requires `addTemplateEngine()` to have been called first |
-| `addAuthorization()` | `config/authorization.php`, and `config/grouper.php` unless an installed extension chose the group directory — plus arguments for the code-level facts; with OIDC, requires `addAuthentication()` first |
-| `enableAutoWiring()` | none |
+`tests/Authorization/` is the local model for new tests.
 
-`guild/starter` is the worked example: it calls `addAuthentication()` and `addAuthorization()`, and
-with guild/dev-tools' persona sign-in on locally, neither `config/authentication.php` nor
-`config/grouper.php` is loaded. Its `AGENTS.md` says how to turn authorization off.
+## Gotchas
 
-## Landmines
+- `routes/authorization.php` holds the framework's own routes, not the app's; `addRouting()` loads the app's file.
+- Migrations run only from a consuming app, with a live database; the comment in `phinx.php` gives the command.
+- The `framework_` table prefix is set in three places; change all three together.
+- `Application::getPath()` throws for any resource but `base` and `config`.
+- `View::render()` rethrows `AuthorizationUnavailableException` unwrapped, so the 503 survives Twig's wrapping.
+- League's not-found path leaves class-name middleware unresolved; `StatusPageResponder` resolves it.
+- Eloquent query-builder calls lose model types under PHPStan; load models, then sort the collection.
+- `Gate` resolves the policy before deciding, so a policy mistake throws for every user.
+- The admin menu is cosmetic; every `/framework` route gates itself with `RequireSystemAdmin`.
+- On the CAS path, `NativeSessionStore` starts the PHP session, with the same cookie flags as guild/access.
 
-- **`routes/` holds the framework's own routes; `db/seeds/` is empty but reserved.** Do not delete either.
-  `routes/authorization.php` is mounted under `/framework/authorization` by `addAuthorization()`, on the
-  shared `Router`, independently of `addRouting()`. `db/seeds/` is referenced by `phinx.php`. Note that
-  `routes/` is **not** the file `addRouting()` loads: that is the *consuming app's* `routes/routes.php`,
-  resolved from its `$basePath`. An application catch-all route registered before `addAuthorization()`
-  can shadow `/framework`.
-- **Migrations cannot be run from this repo.** `phinx.php` does `require dirname(__FILE__, 4) . '/bootstrap/app.php'`,
-  which only resolves when this package sits at `<app>/vendor/guild/framework/phinx.php`. Run it from the
-  consuming app instead:
-  ```bash
-  cd ../starter && vendor/bin/phinx -c vendor/guild/framework/phinx.php migrate -e framework
-  ```
-  `phinx.php` also boots the entire application just to extract a PDO handle from the container, so **a live
-  database connection is required merely to load the config file** — not just to run a migration. DB env
-  vars must be valid before any Phinx command.
-- **The `framework_` table prefix is set in three places.** `phinx.php` sets `table_prefix` and
-  `default_migration_table`; the migrations name bare tables (`groups`, `roles`); the Eloquent models
-  hard-code the prefixed names in `#[Table]`. Change one, change all three.
-- **`ViewServiceProvider` calls a method its type doesn't have.** It calls `$container->getPath(...)`, but
-  `$this->getContainer()` is typed `DefinitionContainerInterface`, which has no `getPath()`. It works only
-  because the concrete container is `Guild\Framework\Application`. This is a real level-10 finding, not a
-  false positive.
-- **`Application::getPath()` throws on unknown resources.** It calls `$this->get('path.' . $resource)` with
-  no existence check, so an unrecognized resource raises a container `NotFoundException` rather than
-  returning `null` as its `?string` signature suggests. Only `path.base` and `path.config` are bound.
-- **Authorization groups and roles are managed at `/framework/authorization`.** The pages register
-  Grouper groups from their ACM label (`findByLabel()`; one match registers, several are offered by
-  identifier, none and "Grouper unreachable" are reported differently), map them to roles on the group's
-  page, and create, edit and delete roles and their grants. Deletes ask for confirmation and detach
-  mappings and grants explicitly rather than relying on the foreign-key cascades. Every write sets
-  `created_by`/`updated_by` to the administrator's username, pivot rows included.
-- **A resource check needs both the grant and the policy.** `UserResolver::current()` returns a `User`
-  or `null` for a guest. `Gate::allows()/denies()/authorize()` take a case of the application's
-  `Permission` enum and an optional resource. Without a resource the user's roles decide; with one, the
-  roles must grant the permission **and** the resource's policy method (bound by `#[Handles]`) must
-  agree. The System Admin group bypasses everything, except when membership is stale.
-- **Policy mistakes throw `ConfigurationException` on first use, for every user** — no policy for the
-  resource's exact class, no `#[Handles]` method for the permission, duplicates, a non-`bool` return, a
-  case from another enum, or a first parameter that is not `User`/`?User`. The policy is resolved before
-  any allow or deny decision, so a mistake cannot hide behind a user who lacks the grant.
-- **Templates name a permission by case or by stored value.** `can('documents.update', document)` and
-  `can(enum('App\\AppPermission').DocumentsUpdate, document)` (Twig) are equivalent; an unknown value
-  throws `ConfigurationException` at render. Templates are not statically analysed, so the value string
-  loses nothing a case would have caught.
-- **`rvt_page` asks for its header items at render time.** `RivetServiceProvider` builds the renderer with
-  `Rivet\ContainerNavigation`, which delegates to whatever the container binds under
-  `Guild\Rivet\Page\NavigationProvider` — `AdminNavigation` when authorization is added with a menu — and
-  otherwise returns the configured `PageDefaults::$navItems`. The lookup happens per page, which is what
-  lets `addRivet()` and `addAuthorization()` be called in either order. `AdminNavigation` never throws for
-  an unanswerable System Admin check; it leaves the menu out. The menu is cosmetic: the `/framework`
-  routes must gate themselves.
-- **The administration pages are PHP-built Rivet documents gated on the System Admin group.** Every
-  `/framework/authorization` route runs `RequireSystemAdmin` (guest or non-member → 403, membership that
-  cannot be confirmed → 503; under OIDC, `RequireSignIn` first, so a guest is asked to sign in) and then
-  `VerifyCsrfToken` (any non-GET must carry the session's `_csrf` field). `Admin\AdminPage` renders through
-  the application's Rivet `Renderer` when `addRivet()` was called, else through a fallback whose navigation
-  is the admin menu alone. Controllers and middleware are bound explicitly, so no autowiring is needed.
-  `AdminPage`, `StatusPage`, `Csrf` and `VerifyCsrfToken` are bound by `FrameworkPageServiceProvider`, which
-  `Application` registers with its base bindings, so the sign-out route uses them without
-  `addAuthorization()` or `addRivet()`. A form `VerifyCsrfToken` refuses gets a 403 "Form expired"
-  `StatusPage`, not an `AdminPage`, so it never carries the administration layout outside the admin pages.
-- **Eloquent query-builder calls lose model types under PHPStan.** Without Larastan, `->orderBy()` and
-  other calls forwarded to the query builder make `->get()` return `Collection<int, stdClass>`. Load the
-  models, then sort the collection (`->get()->sortBy('name')`); the models' `@property` tags then type
-  every column.
-- **`View::render()` unwraps `AuthorizationUnavailableException`.** Twig wraps anything thrown inside a
-  template function in `Twig\Error\RuntimeError`; Latte does not. `View` rethrows the unavailable exception
-  as itself under both engines so `AuthorizationFailureResponder` sees it. Everything else stays wrapped,
-  keeping Twig's template name and line. Rendering through `Environment` directly bypasses this.
-- **Only Grouper membership is cached; grants are read fresh.** Membership lives in the PHP session under
-  `guild_framework_membership` for the configured TTL, is served stale up to the stale cap while Grouper is
-  unreachable (with a warning logged every time), and after that `AuthorizationUnavailableException` is
-  thrown. `User::isSystemAdmin()` never uses stale membership. The role/permission mapping is one query per
-  request, so an administrator's change takes effect on the next request.
-- **The framework starts a PHP session on the CAS path.** Nothing else does there — Apache authenticates
-  before PHP runs — so `Session\NativeSessionStore`, the default `SessionStore` binding, starts one with
-  the same cookie parameters as `guild/access` the first time the session is read or written. Public pages
-  that never check authorization get no session cookie.
-- **The default logger writes through PHP's `error_log()`.** `Application` binds `LoggerInterface` to a
-  Monolog `Logger` on the `framework` channel with an `ErrorLogHandler`, so records land wherever the
-  runtime sends PHP errors. In the `php:*-apache` image that is Apache's `ErrorLog`, which is linked to
-  `/dev/stderr`, which is what a Kubernetes log collector reads. **That is unverified for AppKube's
-  IU-provided image**; if framework warnings do not reach the log platform there, call `withLogger()` with a
-  logger aimed at stderr. Apache prefixes every such line `[php:notice]` regardless of level; the
-  `framework.WARNING:` text is the real level.
+The comment at each gotcha's code explains the reason.
 
-## Branching and pull requests
-
-**Do not commit directly to `develop`.** Work on a feature branch and open a pull request against
-`develop`.
-
-```bash
-git checkout develop && git pull        # start from an up-to-date develop
-git checkout -b <short-descriptive-name>
-# ... commit your work ...
-git push -u origin <short-descriptive-name>
-```
-
-Then open a PR **targeting `develop`**, not `main`. Nothing routine should land on `main` directly.
-
-`composer analyse` has a known-red baseline here — see [Verify your change](#verify-your-change). Don't
-let a PR add *new* failures beyond it.
-
-### Branch and release model
-
-Three stages, and **tags live on `main`, never on `develop`**:
-
-```
-feature branch  --PR-->  develop  --PR-->  main  --> tag (release)
-```
-
-- **`develop`** accumulates day-to-day work. This is where your feature PR goes.
-- **`main`** is the released state. `develop` is merged into it **via its own pull request** when the
-  accumulated work is ready to release.
-- **Tags are applied to `main`** after that merge.
-
-This is the model across all the Guild packages. Consumers, `guild/starter` included, require a `^1.0` tag
-constraint, so **work merged to `develop` reaches no consumer until it is merged to `main` and tagged**.
-
-## Getting a change to consumers
-
-**This is the most common way to waste a session here.** Consumers pull this package as a *downloaded
-zipball* from GitHub — there is no path repository and no symlink. `starter/vendor/guild/framework/` is a
-real directory containing a snapshot, typically several commits behind this repo's HEAD. **Editing
-`src/` here changes nothing in a consuming app, silently.**
-
-Two ways to work:
-
-**Local dev loop** — temporarily point the consumer at your working tree. In `starter/composer.json`, add
-this *above* the existing VCS entries, then `composer update guild/framework`:
-
-```json
-{ "type": "path", "url": "../framework", "options": { "symlink": true } }
-```
-
-**Revert that before committing.** It is a local-only convenience.
-
-**Real publish loop:**
-
-1. Land your change on `develop` via a pull request (see
-   [Branching and pull requests](#branching-and-pull-requests)).
-2. Confirm it is **merged and pushed** — this is the step people skip. Consumers declare a VCS repository
-   at `https://github.com/nathanskky/guild-framework.git`, so Composer resolves from GitHub and cannot see
-   local commits or an unmerged feature branch.
-3. Merge `develop` to `main` and push a **new tag** on `main`. `starter` requires `^1.0`, so it sees
-   only tagged releases — a merge to `develop` alone is invisible to it.
-4. In the consumer, `composer update guild/framework`.
-
-**Never hand-edit `starter/vendor/guild/framework/`** — the next `composer install` reverts it and your
-change never reaches the real package.
-
-Note the mixed auth paths: this repo's `origin` is SSH, but it pulls `guild/access`, `guild/grouper` and
-`guild/rivet` over **HTTPS**, so `composer update` may prompt for GitHub credentials in places where
-`git push` works fine. Bumping `guild/access`, `guild/grouper` or `guild/rivet` additionally requires a
-**new git tag** in that repo, because the constraints here (`^1.0`, `^0.1.3`, `^1.0`) are tag constraints.
-
-Composer reads `repositories` only from the root package, so **every consumer declares the VCS
-repositories for `guild/access`, `guild/grouper` and `guild/rivet` as well as this one** — `starter` does.
-Adding a new VCS-hosted dependency here breaks every consumer's install until each adds its repository
-too.
+The default logger writes through `error_log()`, which reaches standard error in the `php:*-apache`
+image. Whether it reaches the log platform on IU's AppKube image is unverified. If framework warnings go
+missing there, apps can call `withLogger()` with a logger aimed at standard error.

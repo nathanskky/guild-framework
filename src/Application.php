@@ -121,6 +121,10 @@ final class Application extends Container
         return $this;
     }
 
+    /**
+     * Only 'base' and 'config' are bound. Any other resource throws the
+     * container's NotFoundException rather than returning null.
+     */
     public function getPath(string $resource): ?string
     {
         /** @var ?string $path */

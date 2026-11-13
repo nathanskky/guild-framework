@@ -49,6 +49,8 @@ final readonly class RoleController
     {
         $rows = [];
 
+        // Sorted after get(), not with orderBy(): without Larastan, a call forwarded
+        // to the query builder makes get() return stdClass rows under PHPStan.
         foreach (Role::query()->with(['groups', 'permissions'])->get()->sortBy('name') as $role) {
             $rows[] = [
                 Markup::link(self::BASE . '/' . $role->id, $role->name),

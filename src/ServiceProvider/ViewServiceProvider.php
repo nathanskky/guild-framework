@@ -39,6 +39,9 @@ class ViewServiceProvider extends AbstractServiceProvider
 
     public function register(): void
     {
+        // getContainer() is typed DefinitionContainerInterface, which has no
+        // getPath(); the calls below work only because the concrete container is
+        // Application. This is the source of composer analyse's known errors.
         $container = $this->getContainer();
 
         $container->addShared(View::class, function () use ($container) {

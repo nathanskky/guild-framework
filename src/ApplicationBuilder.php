@@ -108,6 +108,15 @@ readonly class ApplicationBuilder
         return $this->app->getPath($resource);
     }
 
+    /**
+     * Load the application's routes from routes/routes.php, which returns a
+     * callable receiving the Router. The container builds the controllers.
+     *
+     * Unlike the other add*() calls, the file isn't wrapped: a missing file
+     * fails as a plain require error, and a file that returns something not
+     * callable registers no routes and raises nothing. /framework is reserved
+     * for the framework's own pages.
+     */
     public function addRouting(): self
     {
         $routesFilePath = $this->app->getPath('base') . '/routes/routes.php';
@@ -122,9 +131,17 @@ readonly class ApplicationBuilder
     }
 
     /**
-     * Sign people in with IU Login, configured by config/authentication.php.
-     * An extension that chose the sign-in method through useSignInMethod()
-     * replaces that: the file is then not read.
+     * Sign people in with IU Login, configured by config/authentication.php,
+     * which returns guild/access's OidcConfiguration. An extension that chose
+     * the sign-in method through useSignInMethod() replaces that: the file is
+     * then not read.
+     *
+     * Routes that need a signed-in user, and the route at the redirect URI, add
+     * Middleware\RequireSignIn. This also mounts POST /framework/sign-out, and
+     * with a template engine, before or after this call, templates get
+     * sign_out_form().
+     *
+     * @throws ConfigurationException if the file is missing or doesn't return an OidcConfiguration
      */
     public function addAuthentication(): self
     {
@@ -434,6 +451,12 @@ readonly class ApplicationBuilder
         return $this;
     }
 
+    /**
+     * Boot Eloquent from config/database.php, which returns an Eloquent
+     * connection array, and share the global Capsule in the container.
+     *
+     * @throws ConfigurationException if the file can't be read or doesn't return an array
+     */
     public function addIlluminateDatabase(): self
     {
         $configFilePath = $this->app->getPath('config') . '/database.php';
@@ -462,6 +485,10 @@ readonly class ApplicationBuilder
         return $this;
     }
 
+    /**
+     * Bind View to Twig or Latte, loading templates from templates/ under the
+     * base path. Takes the engine directly; there is no config file.
+     */
     public function addTemplateEngine(TemplateEngine $engine): self
     {
         $this->app->setTemplateEngine($engine);
